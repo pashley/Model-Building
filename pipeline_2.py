@@ -58,12 +58,7 @@ def preprocessing():
       mkdirp(inputname + '/output_lsq6')            
 
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
-      batch('s1_%s' % inputname, "", './process.py preprocess %s' % subject, job_list) 
-      #if batch_system == 'sge': 
-        #sge_submit("-J s1_%s ./process.py preprocess %s" % (inputname,subject))    
-      #elif batch_system == 'pbs':
-        #pbs_add_job('./process.py preprocess %s' %(inputname), job_list) 
-        
+      batch('s1_%s' % inputname, "", './process.py preprocess %s' % subject, job_list)         
    
   if batch_system == 'pbs':
     pbs_submit_jobs(job_list, "", 4, "10:00:00")
