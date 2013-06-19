@@ -63,19 +63,18 @@ def preprocessing():
 
 
  
-def nonpairwise():
-  # STAGE 2A: alternative to pairwise registrations (i.e. too many inputs)
-        
+def nonpairwise():         # alternative to pairwise registrations (i.e. too many inputs)          
   # select a random input
   targetname = random.randint(1,count)
   if targetname < 10:
     targetname = "H00%s" % targetname
-  else:
+  elif targetname >= 10 and targetname < 100:
     targetname = "H0%s" % targetname
+  else:
+    targetname = "H%s" % targetname
   targetname = "H016"  
   
   # STAGE 2a: lsq12 transformation of each input to a randomly selected subject (not pairwise)
-  # wait for all H###_lsq6.mnc files
   job_list = []
   num = 0
   for subject in glob.glob('inputs/*'):
@@ -97,9 +96,7 @@ def nonpairwise():
     submit_jobs('avgsize','sa_*', './process.py xfmavg_inv_resample %s' %targetname, job_list, 1, "1:00:00", 1, 1) 
   
    
-   
-  # STAGE 2d: repeat lsq12 tranformation for every original input (ex. H001_lsq6.mnc) to the "average size"
-  # wait for avgsize.mnc
+  # STAGE 2c: repeat lsq12 tranformation for every original input (ex. H001_lsq6.mnc) to the "average size", then resample (wait for avgsize.mnc)
   job_list = []
   num = 0
   for subject in glob.glob('inputs/*'): 
@@ -107,97 +104,46 @@ def nonpairwise():
     sourcepath = "%s/output_lsq6/%s_lsq6.mnc" %(sourcename, sourcename)
     targetpath = 'avgsize.mnc'
     outputpath = '%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename) 
-    complete = len(glob.glob('H*/lin_tfiles/H*_lsq12.xfm')) - len(glob.glob('H*/lin_tfiles/H*_H*_lsq12.xfm'))    
-    if not os.path.exists('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename)):
-      print "here"
+    complete = len(glob.glob('H*/timage_lsq12/H*_lsq12.mnc'))   
+    if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename)):         
       num += 1
-      submit_jobs('sd_%s' %sourcename, 'avgsize', './process.py lsq12reg %s %s %s' %(sourcepath, targetpath, outputpath), job_list, 4, "10:00:00", num, count-complete)
-  sys.exit(1)
-
-      
-  # STAGE 3: resample   
-  # wait for H###_lsq12.xfm of a single output
-  job_list = []
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]
-    xfm = '%s/lin_tfiles/%s_lsq12.xfm' %(inputname, inputname)
-    sourcepath = "%s/output_lsq6/%s_lsq6.mnc" %(inputname, inputname)
-    outputpath = '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)
-    
-    if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)):
-      batch('s3_%s' %inputname, 'sd_%s' %inputname, './process.py resample %s %s %s' %(xfm, sourcepath, outputpath), job_list)  
-  if batch_system == 'pbs':
-    pbs_submit_jobs(job_list, "", 4, "10:00:00")
+      submit_jobs('s3_%s' %sourcename, 'avgsize', './process.py lsq12reg_and_resample %s' %sourcename, job_list, 4, "10:00:00", num, count-complete)
   return  
     
     
-#def check2(path,targetnum):
-  #num = 0
-  #for subject in glob.glob(path):
-    #if execute('minccomplete %s' %subject):
-      #print "status = clear for %s" %subject
-      #num += 1
-  #print "num of complete files== %s" %num
-  #if num != int(targetnum):
-    #print "file(s) not complete"
-    #sys.exit(1)
-  #return        
+      
 
-def check2(path,targetnum):
-  targetnum = int(targetnum)  
+def pairwise():
+  # STAGE 2: pairwise lsq12 registrations (wait for all H*_lsq6.mnc files)
+  job_list = []
+  num = 0
+  for subject in glob.glob('inputs/*'):
+    sourcename = subject[7:11]
+    for subject2 in glob.glob('inputs/*'):
+      targetname = subject2[7:11]
+      complete = len(glob.glob('H*/pairwise_tfiles/*_*_lsq12.xfm'))
+      if sourcename != targetname and not os.path.exists('%s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
+          num += 1
+          submit_jobs('s2_%s_%s' %(sourcename[1:4], targetname[1:4]), 's1_*","check_lsq6', './process.py pairwise_reg %s %s' %(sourcename, targetname), job_list, 4, "10:00:00", num, ((count-1)*count)-complete)
+          
+  # STAGE 3: xfm average & resample (wait for all the pairwise registrations of a single input)
+  job_list = []
   num = 0
   for subject in glob.glob('inputs/*'):
     inputname = subject[7:11]
-    try:
-      execute('minccomplete %s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname))
-      num += 1
-    except subprocess.CalledProcessError as e:
-      print "Uh oh missing/incomplete file!"
-      #print e.output
-  if num != targetnum:
-    print "missing files"
-    sys.exit(1)   
-  return    
-
-def pairwise():
-  # STAGE 2: pairwise lsq12 registrations
-  # wait for all H###_lsq6.mnc files
-  job_list = []
-  #execute('./process.py check H*/output_lsq6/H*_lsq6.mnc %s' %count)
-  #check2('H*/output_lsq6/H*_lsq6.mnc', count)
-  print count
-  #check2('H*/output_lsq6/*', count)
-  batch('check_lsq6', 's1_*','./process.py checking %s' % count, job_list)
-  for subject in glob.glob('inputs/H002.mnc*'):
-    sourcename = subject[7:11]
-   
-    for subject2 in glob.glob('inputs/*'):
-      targetname = subject2[7:11]
-      if sourcename != targetname:
-        if not os.path.exists('%s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
-          batch('s2_%s_%s' %(sourcename[1:4], targetname[1:4]), 's1_*","check_lsq6', './process.py pairwise_reg %s %s' %(sourcename, targetname), job_list)
- 
-  # STAGE 3: xfm average & resample
-  # wait for all the pairwise registrations of a single input  
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]
+    complete = len(glob.glob('*/timage_lsq12/*_lsq12.mnc'))
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(inputname,inputname)):
-      batch('s3_%s' %inputname, 's2_%s_*' %inputname[1:4], './process.py avg_and_resample %s' %inputname, job_list)
-  print job_list
-  if batch_system == 'pbs':
-    pbs_submit_jobs(job_list, "", 4, "10:00:00")
+      num += 1
+      submit_jobs('s3_%s' %inputname, 's2_*', './process.py avg_and_resample %s' %inputname, job_list, 4, "10:00:00", num, count-complete)
   return
 
 
 
 def linavg():
-  # STAGE 4: mincaverage   
-  # wait for all H###_lsq12.mnc files
+  # STAGE 4: mincaverage (wait for all H*_lsq12.mnc files)
   job_list = []
   if not os.path.exists('avgimages/linavg.mnc'):
-    batch('linavg', 's3_*', './process.py mnc_avg timage_lsq12 lsq12 linavg.mnc', job_list)
-  if batch_system == 'pbs':
-    pbs_submit_job(job_list, "", 1, "10:00:00")
+    submit_jobs('linavg', 's3_*', './process.py mnc_avg timage_lsq12 lsq12 linavg.mnc', job_list, 1, "1:00:00", 1, 1 )
   return
 
 
@@ -314,3 +260,20 @@ if __name__ == '__main__':
     nonlinregs() 
     #final_stats()
     sys.exit(1)
+    
+    
+    #def check2(path,targetnum):
+      #targetnum = int(targetnum)  
+      #num = 0
+      #for subject in glob.glob('inputs/*'):
+        #inputname = subject[7:11]
+        #try:
+          #execute('minccomplete %s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname))
+          #num += 1
+        #except subprocess.CalledProcessError as e:
+          #print "Uh oh missing/incomplete file!"
+          #print e.output
+      #if num != targetnum:
+        #print "missing files"
+        #sys.exit(1)   
+      #return        
