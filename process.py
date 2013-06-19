@@ -28,17 +28,17 @@ def pairwise_reg(sourcename, targetname):
   return
 
 
-def check(path,targetnum):
-  targetnum = int(targetnum)  
-  num = 0
-  for subject in glob.glob(path):
-    try:
-      execute('minccomplete -e 6 %s' %subject):
-    except subprocess.CalledProcessError as e: 
-      num += 1
-    
-  if num != targetnum:
-    execute("qdel s2*, reg*, nonlin*avg, s6*, s7*")
+def checking(targetnum):
+  execute('qdel -u ashley')
+  #targetnum = int(targetnum)  
+  #num = 0
+  #for subject in glob.glob('inputs/'):
+    #inputname = subject[7:11]
+    #try:
+      #execute('minccomplete %s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname))
+      #num += 1
+    #except subprocess.CalledProcessError:
+      #execute("qdel s2*, reg*, check*, nonlin*avg, s6*, s7*")
   return 
 
 
@@ -63,9 +63,10 @@ def lsq12reg(sourcepath, targetpath, outputpath):
   return
 
 
-def xfmavg_and_inv():
+def xfmavg_inv_resample(targetname):
   execute('xfmavg -clob H*/lin_tfiles/H*_H*_lsq12.xfm lsq12avg.xfm')
   execute('xfminvert -clob lsq12avg.xfm lsq12avg_inverse.xfm')
+  resample('lsq12avg_inverse.xfm','%s/output_lsq6/%s_lsq6.mnc' %(targetname, targetname), 'avgsize.mnc')
   return 
 
 
@@ -114,15 +115,18 @@ def deformation(inputname):
   outputfile.close()
   os.remove('%s/%s_merged2.xfm' %(inputname,inputname))
   execute('minc_displacement %s/timage_lsq12/%s_lsq12.mnc %s/%s_merged.xfm %s/final_stats/%s_grid.mnc' %(inputname, inputname, inputname, inputname, inputname, inputname))
+  execute('minccalc -clob %s/final_stats/%s_grid.mnc -expression "-1*A[0]" %s/final_stats/%s_inversegrid.mnc' %(inputname, inputname, inputname, inputname))
+  execute('mincblob -determinant %s/final_stats/%s_inversegrid.mnc %s/final_stats/%s_det.mnc' %(inputname, inputname, inputname, inputname))
+  execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' %(inputname, inputname, inputname, inputname))  
   return
   
 
 
-def det_and_blur(inputname):
-  execute('minccalc -clob %s/final_stats/%s_grid.mnc -expression "-1*A[0]" %s/final_stats/%s_inversegrid.mnc' %(inputname, inputname, inputname, inputname))
-  execute('mincblob -determinant %s/final_stats/%s_inversegrid.mnc %s/final_stats/%s_det.mnc' %(inputname, inputname, inputname, inputname))
-  execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' %(inputname, inputname, inputname, inputname))
-  return
+#def det_and_blur(inputname):
+  #execute('minccalc -clob %s/final_stats/%s_grid.mnc -expression "-1*A[0]" %s/final_stats/%s_inversegrid.mnc' %(inputname, inputname, inputname, inputname))
+  #execute('mincblob -determinant %s/final_stats/%s_inversegrid.mnc %s/final_stats/%s_det.mnc' %(inputname, inputname, inputname, inputname))
+  #execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' %(inputname, inputname, inputname, inputname))
+  #return
   
 
 
@@ -134,14 +138,14 @@ if __name__ == '__main__':
     preprocess(sys.argv[2])
   elif cmd == 'pairwise_reg':
     pairwise_reg(sys.argv[2], sys.argv[3])
-  elif cmd == 'check':
-    check(sys.argv[2], sys.argv[3])      
+  elif cmd == 'checking':
+    checking(sys.argv[2])      
   elif cmd == 'check_lsq12':
     check_lsq12(sys.argv[2])
   elif cmd == 'lsq12reg':
     lsq12reg(sys.argv[2], sys.argv[3], sys.argv[4])
-  elif cmd == 'xfmavg_and_inv':
-    xfmavg_and_inv()
+  elif cmd == 'xfmavg_inv_resample':
+    xfmavg_inv_resample(sys.argv[2])
   elif cmd == 'resample':
     resample(sys.argv[2], sys.argv[3], sys.argv[4])     
   elif cmd == 'avg_and_resample':
@@ -154,7 +158,7 @@ if __name__ == '__main__':
     nonlin_reg(sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],sys.argv[6])
   elif cmd == 'deformation':
     deformation(sys.argv[2])
-  elif cmd == 'det_and_blur':
-    det_and_blur(sys.argv[2])
+  #elif cmd == 'det_and_blur':
+    #det_and_blur(sys.argv[2])
 
 

@@ -56,3 +56,17 @@ if __name__ == '__main__':
   elif cmd == 'pairwise':
     pairwise()
    
+   
+def check(path,targetnum):
+  targetnum = int(targetnum)  
+  num = 0
+  for subject in glob.glob(path):
+    try:
+      execute('minccomplete -e 6 %s' %subject):
+    except subprocess.CalledProcessError as e: 
+      print e.output
+      num += 1
+    
+  if num != targetnum:
+    execute("qdel s2*, reg*, nonlin*avg, s6*, s7*")
+  return 

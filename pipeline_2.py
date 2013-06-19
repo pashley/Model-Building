@@ -11,58 +11,54 @@ import random
 
 # "module load civet" for mincbet
 
-
-job_submitted = False
-
-def sge_submit(command): 
-  execute("sge_batch " + command)
-  global job_submitted
-  job_submitted = True
-  return
-
-
-def pbs_add_job(command,job_list):        
-  # add command to the end of a list to be submitted later
-  job_list.append(command)
-  return
-
-
-def pbs_submit_jobs(job_list, depends, batchsize, time): 
-  # call qbatch on jobs.list.txt with -J depends batchsize time
-  execute('./qbatch %s %s %s' %(job_list, batchsize, time))
-  return
-
-
-def batch(jobname, depends, command, job_list):
-  if batch_system == 'sge':
-    sge_submit('-J %s -H "%s" %s' %(jobname, depends, command))
-  elif batch_system == 'pbs':
-    pbs_add_job(command, job_list)
-  return
-
+for subject in glob.glob('inputs/*'):
+  name = subject[7:11]
+  if not os.path.exists(name + '/'):
+    mkdirp(name)                          
+    mkdirp(name + '/NUC')                
+    mkdirp(name + '/NORM')                 
+    mkdirp(name + '/masks')              
+    mkdirp(name + '/lin_tfiles')          
+    mkdirp(name + '/output_lsq6')        
+    mkdirp(name + '/pairwise_tfiles')      
+    mkdirp(name + '/timage_lsq12')         
+    mkdirp('avgimages')                  
+    mkdirp(name + '/tfiles_nonlin')      
+    mkdirp(name + '/timages_nonlin')     
+    mkdirp(name + '/final_stats')        
+               
 
 count = 0
 for subject in glob.glob('inputs/*'):
   count += 1
   
+
+
+
+def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjobs): 
+  if batch_system == 'sge':
+    execute('sge_batch -J %s -H "%s" %s' %(jobname, depends, command))
+  elif batch_system == 'pbs':
+    job_list.append(command)
+    if num == numjobs:       # when all commands are added to the list, submit the list
+      print 'num == %s' %num
+      print 'numjobs %s' %numjobs
+      for i in job_list:
+        print i
+      #execute('./qbatch %s %s %s -H %s' %(job_list, batchsize, time, depends))  
+  return
+
+
+
 def preprocessing():
   job_list = []
+  num = 0
   for subject in glob.glob('inputs/*'):
     inputname = subject[7:11]
-    if not os.path.exists(inputname + '/'):
-      mkdirp(inputname)                         
-      mkdirp(inputname + '/NUC')                
-      mkdirp(inputname + '/NORM')                 
-      mkdirp(inputname + '/masks')              
-      mkdirp(inputname + '/lin_tfiles')          
-      mkdirp(inputname + '/output_lsq6')            
-
+    complete = len(glob.glob('H*/output_lsq6/*_lsq6.mnc'))
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
-      batch('s1_%s' % inputname, "", './process.py preprocess %s' % subject, job_list)         
-   
-  if batch_system == 'pbs':
-    pbs_submit_jobs(job_list, "", 4, "10:00:00")
-    #pbs_submit_jobs('s1_<subject>', batchsize, time)
+      num += 1
+      submit_jobs('s1_%s' % inputname, "", './process.py preprocess %s' % subject, job_list, 4, "10:00:00", num, count-complete)         
   return 
 
 
@@ -76,53 +72,48 @@ def nonpairwise():
     targetname = "H00%s" % targetname
   else:
     targetname = "H0%s" % targetname
-  #targetname = "H016"  
+  targetname = "H016"  
   
   # STAGE 2a: lsq12 transformation of each input to a randomly selected subject (not pairwise)
   # wait for all H###_lsq6.mnc files
   job_list = []
+  num = 0
   for subject in glob.glob('inputs/*'):
     sourcename = subject[7:11]     
     sourcepath = "%s/output_lsq6/%s_lsq6.mnc" %(sourcename, sourcename)
     targetpath = "%s/output_lsq6/%s_lsq6.mnc" %(targetname, targetname)
-    outputpath = "%s/lin_tfiles/%s_%s_lsq12.xfm" %(sourcename,sourcename,targetname)    
+    outputpath = "%s/lin_tfiles/%s_%s_lsq12.xfm" %(sourcename,sourcename,targetname)
+    complete = len(glob.glob('H*/lin_tfiles/H*_H*_lsq12.xfm'))
     if sourcename != targetname:
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
-        batch('sa_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py lsq12reg %s %s %s' %(sourcepath, targetpath, outputpath),job_list)       
-  if batch_system == 'pbs':
-    pbs_submit_jobs(job_list,"s1_*", 4, "10:00:00")
+        num += 1
+        submit_jobs('sa_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py lsq12reg %s %s %s' %(sourcepath, targetpath, outputpath),job_list, 4, "10:00:00", num, count-complete-1)
         
 
-  # STAGE 2b: average all lsq12 xfm files and invert this average
-  # wait for all H###_H###_lsq12.xfm files
-  job_list = []
-  if not os.path.exists('lsq12avg_inverse.xfm'):
-    batch('xfmavg_inv','sa_*', './process.py xfmavg_and_inv', job_list) 
-  if batch_system == 'pbs':
-    pbs_submit_jobs(job_list,"sa_*",1, "10:00:00")
-  
-  
-  # STAGE 2c: resample (apply inverted averaged xfm to randomly selected subject)
-  # wait for lsq12avg_inverse.xfm
+  # STAGE 2b: average all lsq12 xfm files, invert this average, resample (apply inverted averaged xfm to randomly selected subject)
+  # wait for all H*_H*_lsq12.xfm files
   job_list = []
   if not os.path.exists('avgsize.mnc'):
-    batch('avgsize', 'xfmavg_inv', './process.py resample %s %s/output_lsq6/%s_lsq6.mnc avgsize.mnc' %('lsq12avg_inverse.xfm', targetname, targetname), job_list)  
-  if batch_system == 'pbs':
-    pbs_submit_jobs(job_list,"xfmavg_inv",1, "10:00:00")
-    
+    submit_jobs('avgsize','sa_*', './process.py xfmavg_inv_resample %s' %targetname, job_list, 1, "1:00:00", 1, 1) 
+  
    
-  # STAGE 2d: repeat lsq12 tranformation for every original input (ex. H001_lsq6.mnc) to the "average"
-  # wait for H###_avglsq12.mnc of a single output
+   
+  # STAGE 2d: repeat lsq12 tranformation for every original input (ex. H001_lsq6.mnc) to the "average size"
+  # wait for avgsize.mnc
   job_list = []
+  num = 0
   for subject in glob.glob('inputs/*'): 
     sourcename = subject[7:11]
     sourcepath = "%s/output_lsq6/%s_lsq6.mnc" %(sourcename, sourcename)
     targetpath = 'avgsize.mnc'
     outputpath = '%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename) 
+    complete = len(glob.glob('H*/lin_tfiles/H*_lsq12.xfm')) - len(glob.glob('H*/lin_tfiles/H*_H*_lsq12.xfm'))    
     if not os.path.exists('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename)):
-      batch('sd_%s' %sourcename, 'avgsize', './process.py lsq12reg %s %s %s' %(sourcepath, targetpath, outputpath), job_list)
-  if batch_system == 'pbs':
-    pbs_submit_jobs(job_list, "", 4, "10:00:00")
+      print "here"
+      num += 1
+      submit_jobs('sd_%s' %sourcename, 'avgsize', './process.py lsq12reg %s %s %s' %(sourcepath, targetpath, outputpath), job_list, 4, "10:00:00", num, count-complete)
+  sys.exit(1)
+
       
   # STAGE 3: resample   
   # wait for H###_lsq12.xfm of a single output
@@ -132,8 +123,7 @@ def nonpairwise():
     xfm = '%s/lin_tfiles/%s_lsq12.xfm' %(inputname, inputname)
     sourcepath = "%s/output_lsq6/%s_lsq6.mnc" %(inputname, inputname)
     outputpath = '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)
-    if not os.path.exists(inputname + '/timage_lsq12'):
-      mkdirp(inputname + '/timage_lsq12')       # stores resampled images from lsq12 averages    
+    
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)):
       batch('s3_%s' %inputname, 'sd_%s' %inputname, './process.py resample %s %s %s' %(xfm, sourcepath, outputpath), job_list)  
   if batch_system == 'pbs':
@@ -153,6 +143,21 @@ def nonpairwise():
     #sys.exit(1)
   #return        
 
+def check2(path,targetnum):
+  targetnum = int(targetnum)  
+  num = 0
+  for subject in glob.glob('inputs/*'):
+    inputname = subject[7:11]
+    try:
+      execute('minccomplete %s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname))
+      num += 1
+    except subprocess.CalledProcessError as e:
+      print "Uh oh missing/incomplete file!"
+      #print e.output
+  if num != targetnum:
+    print "missing files"
+    sys.exit(1)   
+  return    
 
 def pairwise():
   # STAGE 2: pairwise lsq12 registrations
@@ -161,11 +166,11 @@ def pairwise():
   #execute('./process.py check H*/output_lsq6/H*_lsq6.mnc %s' %count)
   #check2('H*/output_lsq6/H*_lsq6.mnc', count)
   print count
-  batch('check_lsq6', 's1_*','./process.py check H*/output_lsq6/H*_lsq6.mnc %s' % count, job_list)
+  #check2('H*/output_lsq6/*', count)
+  batch('check_lsq6', 's1_*','./process.py checking %s' % count, job_list)
   for subject in glob.glob('inputs/H002.mnc*'):
     sourcename = subject[7:11]
-    if not os.path.exists(sourcename + '/pairwise_tfiles'):
-      mkdirp(sourcename + '/pairwise_tfiles')
+   
     for subject2 in glob.glob('inputs/*'):
       targetname = subject2[7:11]
       if sourcename != targetname:
@@ -178,6 +183,7 @@ def pairwise():
     inputname = subject[7:11]
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(inputname,inputname)):
       batch('s3_%s' %inputname, 's2_%s_*' %inputname[1:4], './process.py avg_and_resample %s' %inputname, job_list)
+  print job_list
   if batch_system == 'pbs':
     pbs_submit_jobs(job_list, "", 4, "10:00:00")
   return
@@ -188,8 +194,6 @@ def linavg():
   # STAGE 4: mincaverage   
   # wait for all H###_lsq12.mnc files
   job_list = []
-  if not os.path.exists('avgimages/'):
-    mkdirp('avgimages')              # stores average image after each registration
   if not os.path.exists('avgimages/linavg.mnc'):
     batch('linavg', 's3_*', './process.py mnc_avg timage_lsq12 lsq12 linavg.mnc', job_list)
   if batch_system == 'pbs':
@@ -228,9 +232,7 @@ def nonlinregs():
   
   for subject in glob.glob('inputs/H002.mnc*'):
     inputname = subject[7:11]
-    if not os.path.exists(inputname + '/tfiles_nonlin'):
-      mkdirp(inputname + '/tfiles_nonlin')     
-      mkdirp(inputname + '/timages_nonlin')       
+        
     nonlinreg_and_avg('1', 'timage_lsq12','lsq12','linavg.mnc', '100x1x1x1')
     batch('check_reg1', 'nonlin1avg', './process.py check_reg 1', job_list)
     
@@ -251,8 +253,6 @@ def final_stats():
   job_list = []
   for subject in glob.glob('inputs/H001.mnc*'):
     inputname = subject[7:11]
-    if not os.path.exists(inputname + '/final_stats'):
-      mkdirp(inputname + '/final_stats')         
     if not os.path.exists('%s/final_stats/%s_grid.mnc' %(inputname, inputname)):
       batch('s6_%s' % inputname, 'reg*_%s","check_lsq12' %inputname[1:4], './process.py deformation %s' % inputname, job_list)
       
@@ -305,7 +305,7 @@ if __name__ == '__main__':
     sys.exit(1)
       
   elif cmd == "all":
-    preprocessing()
+    #preprocessing()
     if count > 20:   
       nonpairwise()
     elif count < 20:
