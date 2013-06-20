@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import argparse
 import glob
 import os
 from os.path import join as join, basename as basename, exists
@@ -162,12 +163,12 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
   # STAGE 5: nonlinear registrations & averaging (wait for previous average == targetimage)
   job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'):
+  for subject in glob.glob('inputs/H002*'):
     inputname = subject[7:11]  
     complete = len(glob.glob('H*/timages_nonlin/*_nonlin%s.mnc' %number))
     if not os.path.exists('%s/timages_nonlin/%s_nonlin%s.mnc' %(inputname,inputname, number)):
       num += 1
-      submit_jobs('reg%s_%s' %(number, inputname[1:4]), '%s' %targetimage[0:-4], './process.py nonlin_reg %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations), job_list, 4, "10:00:00", num, count-complete)
+      submit_jobs('reg%s_%s' %(number, inputname[1:4]), '%s","check_lsq12' %targetimage[0:-4], './process.py nonlin_reg %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations), job_list, 4, "10:00:00", num, count-complete)
   
   job_list = []     
   # wait for all H*_nonlin#.mnc files    
@@ -178,10 +179,10 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
  
  
 def nonlinregs():
-  
   # Check for successful completion of (pairwise or non-pairwise) lsq12 registration 
   # if unsuccessful then stop program, else continue
-  #batch('check_lsq12', 'linavg', './process.py check_lsq12 %s' % count, job_list)
+  job_list = []
+  submit_jobs('check_lsq12', 'linavg', './process.py check_lsq12 %s' % count, job_list, 1, '1:00:00', 1,1)
   
   nonlinreg_and_avg('1', 'timage_lsq12','lsq12','linavg.mnc', '100x1x1x1')
   #submit_jobs('check_reg1', 'nonlin1avg', './process.py check_reg 1', job_list)
@@ -211,55 +212,133 @@ def final_stats():
   return
 
 
+def print_batch():
+  print "batch_system == %s" %batch_system
+  return
 
 
+def pp():
+  print "preprocess"
+  return
 
+
+def pair():
+  print "pair"
+  return
+
+
+def nonpair():
+  print "nonpair"
+  return
+
+
+def la():
+  print "la"
+  return
+
+def nlreg():
+  print "nonlinreg"
+  return
+
+def fstat():
+  print "fstat"
+  return
 
 
 if __name__ == '__main__':
-  cmd = sys.argv[1]           # first command line argument: stage to execute (options: preprocess, lsq12_p, lsq12_n, lsq12, linavg, nonlinreg, finalstats, all)           
-  batch_system = sys.argv[2]  # second command line argument: batch system to run pipeline (options: sge or pbs)
-                            
-  if cmd == 'preprocess':
-    preprocessing()
-    sys.exit(1)
-  
-  elif cmd[0:5] == 'lsq12':
-    # "lsq12-p" or "lsq12-n"      
-    if len(cmd) > 5:            
-      if cmd[6] == 'p':         # pairwise
-        pairwise()
-      elif cmd[6] == 'n':       # non-pairwise
-        nonpairwise()
-    # "lsq12"
-    elif len(cmd) == 5:         # when 'pairwise' or 'non-pairwise' is not specified, perform lsq12 registration method according to the number of inputs  
-      if count < 20:
-        pairwise()
-      else:
-        nonpairwise()
-    sys.exit(1)
+  parser = argparse.ArgumentParser()
+  parser.add_argument("-s", choices=['preprocess','lsq12', 'lsq12-p', 'lsq12-n',
+                                     'linavg', 'nonlinreg', 'finalstats'], 
+                            help="stage to execute")
+  parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
+                      help="batch system to process jobs")
 
-  elif cmd == 'linavg':
-    linavg()
-    sys.exit(1)
+  args = parser.parse_args()
+  stage = args.s
+  batch_system = args.batch_system
   
-  elif cmd == 'nonlinreg':
-    nonlinregs()
-    sys.exit(1)
-         
-  elif cmd == 'finalstats':
-    final_stats()
-    sys.exit(1)
-      
-  elif cmd == "all":
-    preprocessing()
-    if count > 20:   
+  if batch_system == 'sge':
+    print_batch()
+  elif batch_system == 'pbs':
+    print_batch()
+  elif batch_system == 'loc':
+    print_batch()
+  
+  if stage == 'preprocess':
+    preprocess()
+  elif stage == 'lsq12':
+    if count > 20:
       nonpairwise()
     elif count <= 20:
       pairwise()
+  elif stage == 'lsq12-n':
+    nonpairwise()
+  elif stage == 'lsq12-p':
+    pairwise()
+  elif stage == 'linavg':
     linavg()
-    nonlinregs() 
-    final_stats()
-    sys.exit(1)
+  elif stage == 'nonlinreg':
+    nonlinregs()
+  elif stage == 'finalstats':
+    finalstats()
+  else:
+    preprocess()
+    if count > 20:
+      nonpairwise()
+    elif count <= 20:
+      pairwise()    
+    linavg()
+    nonlinregs
+    finalstats()
+
+    
+    
+  
+      
+  
+  #cmd = sys.argv[1]           # first command line argument: stage to execute (options: preprocess, lsq12_p, lsq12_n, lsq12, linavg, nonlinreg, finalstats, all)           
+  #batch_system = sys.argv[2]  # second command line argument: batch system to run pipeline (options: sge or pbs)
+                            
+  #if cmd == 'preprocess':
+    #preprocessing()
+    #sys.exit(1)
+  
+  #elif cmd[0:5] == 'lsq12':
+    # "lsq12-p" or "lsq12-n"      
+    #if len(cmd) > 5:            
+      #if cmd[6] == 'p':         # pairwise
+        #pairwise()
+      #elif cmd[6] == 'n':       # non-pairwise
+        #nonpairwise()
+    # "lsq12"
+    #elif len(cmd) == 5:         # when 'pairwise' or 'non-pairwise' is not specified, perform lsq12 registration method according to the number of inputs  
+      #if count < 20:
+        #pairwise()
+      #else:
+        #nonpairwise()
+    #sys.exit(1)
+
+  #elif cmd == 'linavg':
+    #linavg()
+    #sys.exit(1)
+  
+  #elif cmd == 'nonlinreg':
+    #nonlinregs()
+    #sys.exit(1)
+         
+  #elif cmd == 'finalstats':
+    #final_stats()
+    #sys.exit(1)
+      
+  #elif cmd == "all":
+    #preprocessing()
+    #if count > 20:   
+      #nonpairwise()
+    #elif count <= 20:
+      #pairwise()
+    #linavg()
+    #nonlinregs() 
+    #final_stats()
+    #sys.exit(1)
     
     
