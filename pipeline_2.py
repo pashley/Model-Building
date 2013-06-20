@@ -39,7 +39,6 @@ for subject in glob.glob('inputs/*'):
 def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjobs): 
   if batch_system == 'sge':
     execute('sge_batch -J %s -H "%s" %s' %(jobname, depends, command))
-  
   elif batch_system == 'pbs':
     job_list.append(command)
     if num == numjobs:       # when all commands are added to the list, submit the list
@@ -48,7 +47,6 @@ def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjo
       for i in job_list:
         print i
       #execute('./MAGeTbrain/bin/qbatch --afterok_pattern %s %s %s %s ' %(depends, job_list, batchsize, time))
-  
   elif batch_system == 'loc':  # run locally
     execute(command)
   return
@@ -62,7 +60,7 @@ def preprocessing():
     complete = len(glob.glob('H*/output_lsq6/*_lsq6.mnc'))
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       num += 1
-      submit_jobs('s1_%s' % inputname, "", './process.py preprocess %s' % subject, job_list, 4, "10:00:00", num, count-complete)         
+      submit_jobs('s1_%s' % inputname, "", './process.py preprocess %s' % subject, job_list, 8, "10:00:00", num, count-complete)         
   return 
 
  
@@ -86,14 +84,14 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
     if sourcename != targetname:
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         num += 1
-        submit_jobs('sa_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 4, "10:00:00", num, count-complete-1)
+        submit_jobs('sa_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "10:00:00", num, count-complete-1)
   
 
   # STAGE 2b: average all lsq12 xfm files, invert this average, resample (apply inverted averaged xfm to randomly selected subject)
   # wait for all H*_H*_lsq12.xfm files
   job_list = []
   if not os.path.exists('avgsize.mnc'):
-    submit_jobs('avgsize','sa_*', './process.py xfmavg_inv_resample %s' %targetname, job_list, 1, "1:00:00", 1, 1) 
+    submit_jobs('avgsize','sa_*', './process.py xfmavg_inv_resample %s' %targetname, job_list, 8, "1:00:00", 1, 1) 
   
    
   # STAGE 2c: repeat lsq12 tranformation for every original input (ex. H001_lsq6.mnc) to the "average size", then resample (wait for avgsize.mnc)
@@ -104,25 +102,10 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
     complete = len(glob.glob('H*/timage_lsq12/H*_lsq12.mnc'))   
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename)):         
       num += 1
-      submit_jobs('s3_%s' %sourcename, 'avgsize', './process.py lsq12reg_and_resample %s' %sourcename, job_list, 4, "10:00:00", num, count-complete)
+      submit_jobs('s3_%s' %sourcename, 'avgsize', './process.py lsq12reg_and_resample %s' %sourcename, job_list, 8, "10:00:00", num, count-complete)
   return  
     
  
-def check2(targetnum):  
-  num = 0
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]
-    try:
-      execute('minccomplete %s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname))
-      num += 1
-    except subprocess.CalledProcessError as e:
-      print "missing/incomplete file!"
-      #print e.output
-      execute('qdel s2*')
-  if num != targetnum:
-    print "missing files"   
-  return            
-      
 
 def pairwise():
   # STAGE 2: pairwise lsq12 registrations (wait for all H*_lsq6.mnc files)  
@@ -136,7 +119,7 @@ def pairwise():
       complete = len(glob.glob('H*/pairwise_tfiles/*_*_lsq12.xfm'))
       if sourcename != targetname and not os.path.exists('%s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         num += 1
-        submit_jobs('s2_%s_%s' %(sourcename[1:4], targetname[1:4]), 's1_*","check_lsq6', './process.py pairwise_reg %s %s' %(sourcename, targetname), job_list, 4, "10:00:00", num, ((count-1)*count)-complete)
+        submit_jobs('s2_%s_%s' %(sourcename[1:4], targetname[1:4]), 's1_*","check_lsq6', './process.py pairwise_reg %s %s' %(sourcename, targetname), job_list, 8, "10:00:00", num, ((count-1)*count)-complete)
           
   # STAGE 3: xfm average & resample (wait for all the pairwise registrations of a single input)
   job_list = []
@@ -146,7 +129,7 @@ def pairwise():
     complete = len(glob.glob('*/timage_lsq12/*_lsq12.mnc'))
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(inputname,inputname)):
       num += 1
-      submit_jobs('s3_%s' %inputname, 's2_*', './process.py avg_and_resample %s' %inputname, job_list, 4, "10:00:00", num, count-complete)
+      submit_jobs('s3_%s' %inputname, 's2_*', './process.py avg_and_resample %s' %inputname, job_list, 8, "10:00:00", num, count-complete)
   return
 
 
@@ -154,7 +137,7 @@ def linavg():
   # STAGE 4: mincaverage (wait for all H*_lsq12.mnc files)
   job_list = []
   if not os.path.exists('avgimages/linavg.mnc'):
-    submit_jobs('linavg', 's3_*', './process.py mnc_avg timage_lsq12 lsq12 linavg.mnc', job_list, 1, "1:00:00", 1, 1)
+    submit_jobs('linavg', 's3_*', './process.py mnc_avg timage_lsq12 lsq12 linavg.mnc', job_list, 8, "1:00:00", 1, 1)
   return
 
 
@@ -168,22 +151,32 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
     complete = len(glob.glob('H*/timages_nonlin/*_nonlin%s.mnc' %number))
     if not os.path.exists('%s/timages_nonlin/%s_nonlin%s.mnc' %(inputname,inputname, number)):
       num += 1
-      submit_jobs('reg%s_%s' %(number, inputname[1:4]), '%s","check_lsq12' %targetimage[0:-4], './process.py nonlin_reg %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations), job_list, 4, "10:00:00", num, count-complete)
+      submit_jobs('reg%s_%s' %(number, inputname[1:4]), '%s","check_lsq12' %targetimage[0:-4], './process.py nonlin_reg %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations), job_list, 8, "10:00:00", num, count-complete)
   
   job_list = []     
   # wait for all H*_nonlin#.mnc files    
   if not os.path.exists('avgimages/nonlin%savg.mnc' % number):
-    submit_jobs('nonlin%savg' %number,'reg%s_*","check_lsq12' %number, './process.py mnc_avg timages_nonlin nonlin%s nonlin%savg.mnc' %(number, number), job_list, 1, "10:00:00",1,1)
+    submit_jobs('nonlin%savg' %number,'reg%s_*","check_lsq12' %number, './process.py mnc_avg timages_nonlin nonlin%s nonlin%savg.mnc' %(number, number), job_list, 8, "10:00:00",1,1)
   return
  
- 
- 
+  
+def checklsq12():  
+  for subject in glob.glob('inputs/*'):
+    inputname = subject[7:11]
+  try:
+    execute('minccomplete minccomplete avgimages/linavg.mnc')
+  except subprocess.CalledProcessError as e:
+    print "Uh oh! A missing/incomplete file!"
+    #print e.output
+    execute('qdel reg*')   
+  return            
+      
+
 def nonlinregs():
   # Check for successful completion of (pairwise or non-pairwise) lsq12 registration 
   # if unsuccessful then stop program, else continue
   job_list = []
-  submit_jobs('check_lsq12', 'linavg', './process.py check_lsq12 %s' % count, job_list, 1, '1:00:00', 1,1)
-  
+  submit_jobs('check_lsq12', 'linavg', './process.py check_lsq12', job_list, 8, '1:00:00', 1,1)
   nonlinreg_and_avg('1', 'timage_lsq12','lsq12','linavg.mnc', '100x1x1x1')
   #submit_jobs('check_reg1', 'nonlin1avg', './process.py check_reg 1', job_list)
   
@@ -203,53 +196,22 @@ def final_stats():
   # wait for all nonlinear registrations of a single input to be complete 
   job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'):
+  for subject in glob.glob('inputs/H001.mnc*'):
     inputname = subject[7:11]
     complete = len(glob.glob('H*/final_stats/*_blur.mnc'))
     if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
       num += 1
-      submit_jobs('s6_%s' % inputname, 'reg*_%s","check_lsq12' %inputname[1:4], './process.py deformation %s' % inputname, job_list, 4, "10:00:00", num, count-complete)
+      submit_jobs('s6_%s' % inputname, 'reg*","check_lsq12', './process.py deformation %s' % inputname, job_list, 8, "10:00:00", num, count-complete)
   return
 
-
-def print_batch():
-  print "batch_system == %s" %batch_system
-  return
-
-
-def pp():
-  print "preprocess"
-  return
-
-
-def pair():
-  print "pair"
-  return
-
-
-def nonpair():
-  print "nonpair"
-  return
-
-
-def la():
-  print "la"
-  return
-
-def nlreg():
-  print "nonlinreg"
-  return
-
-def fstat():
-  print "fstat"
-  return
 
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
-  parser.add_argument("-s", choices=['preprocess','lsq12', 'lsq12-p', 'lsq12-n',
-                                     'linavg', 'nonlinreg', 'finalstats'], 
-                            help="stage to execute")
+  parser.add_argument("-s",
+                      choices=['preprocess','lsq12', 'lsq12-p', 'lsq12-n',
+                               'linavg', 'nonlinreg', 'finalstats'],
+                      help="stage to execute")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
                       help="batch system to process jobs")
 
@@ -257,15 +219,8 @@ if __name__ == '__main__':
   stage = args.s
   batch_system = args.batch_system
   
-  if batch_system == 'sge':
-    print_batch()
-  elif batch_system == 'pbs':
-    print_batch()
-  elif batch_system == 'loc':
-    print_batch()
-  
   if stage == 'preprocess':
-    preprocess()
+    preprocessing()
   elif stage == 'lsq12':
     if count > 20:
       nonpairwise()
@@ -280,7 +235,8 @@ if __name__ == '__main__':
   elif stage == 'nonlinreg':
     nonlinregs()
   elif stage == 'finalstats':
-    finalstats()
+    print "here"
+    final_stats()
   else:
     preprocess()
     if count > 20:
@@ -292,53 +248,31 @@ if __name__ == '__main__':
     finalstats()
 
     
-    
-  
-      
-  
-  #cmd = sys.argv[1]           # first command line argument: stage to execute (options: preprocess, lsq12_p, lsq12_n, lsq12, linavg, nonlinreg, finalstats, all)           
-  #batch_system = sys.argv[2]  # second command line argument: batch system to run pipeline (options: sge or pbs)
-                            
-  #if cmd == 'preprocess':
+  #if args.p:
     #preprocessing()
-    #sys.exit(1)
-  
-  #elif cmd[0:5] == 'lsq12':
-    # "lsq12-p" or "lsq12-n"      
-    #if len(cmd) > 5:            
-      #if cmd[6] == 'p':         # pairwise
-        #pairwise()
-      #elif cmd[6] == 'n':       # non-pairwise
+  #elif args.lsq12:
+    #if args.lsq12 == 'p':
+      #pairwise()
+    #elif args.lsq12 == 'n':
+      #nonpairwise()
+    #else:
+      #if count > 20:
         #nonpairwise()
-    # "lsq12"
-    #elif len(cmd) == 5:         # when 'pairwise' or 'non-pairwise' is not specified, perform lsq12 registration method according to the number of inputs  
-      #if count < 20:
+      #elif count <= 20:
         #pairwise()
-      #else:
-        #nonpairwise()
-    #sys.exit(1)
-
-  #elif cmd == 'linavg':
+  #elif args.avg:
     #linavg()
-    #sys.exit(1)
-  
-  #elif cmd == 'nonlinreg':
+  #elif args.nlreg:
     #nonlinregs()
-    #sys.exit(1)
-         
-  #elif cmd == 'finalstats':
-    #final_stats()
-    #sys.exit(1)
-      
-  #elif cmd == "all":
-    #preprocessing()
-    #if count > 20:   
+  #elif args.fs:
+    #final_stats
+  #else:
+    #preprocess()
+    #if count > 20:
       #nonpairwise()
     #elif count <= 20:
       #pairwise()
     #linavg()
-    #nonlinregs() 
-    #final_stats()
-    #sys.exit(1)
-    
-    
+    #nonlinregs
+    #final_stats()    
+     
