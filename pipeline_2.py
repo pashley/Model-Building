@@ -11,29 +11,13 @@ import tempfile
 
 
 # "module load civet" for mincbet
+        
+#count = 0
+#for subject in glob.glob('inputs/*'):
+  #count += 1
 
-for subject in glob.glob('inputs/*'):
-  name = subject[7:11]
-  if not os.path.exists(name + '/'):
-    mkdirp(name)                          
-    mkdirp(name + '/NUC')                
-    mkdirp(name + '/NORM')                 
-    mkdirp(name + '/masks')              
-    mkdirp(name + '/lin_tfiles')          
-    mkdirp(name + '/output_lsq6')        
-    mkdirp(name + '/pairwise_tfiles')      
-    mkdirp(name + '/timage_lsq12')         
-    mkdirp('avgimages')                  
-    mkdirp(name + '/tfiles_nonlin')      
-    mkdirp(name + '/timages_nonlin')     
-    mkdirp(name + '/final_stats')        
-if not os.path.exists('tempfiles/'):
-  mkdirp('tempfiles')               
 
-count = 0
-for subject in glob.glob('inputs/*'):
-  count += 1
-  
+
 
 
 def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjobs): 
@@ -42,11 +26,13 @@ def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjo
   elif batch_system == 'pbs':
     job_list.append(command)
     if num == numjobs:       # when all commands are added to the list, submit the list
-      cmdfileinfo = tempfile.mkstemp(dir='./')
-      cmdfile = open(cmdfileinfo[1], 'w')
-      cmdfile.write("\n".join(job_list))
-      cmdfile.close()
-      execute('./MAGeTbrain/bin/qbatch --afterok_pattern %s %s %s %s ' %(depends, basename(cmdfileinfo[1]), batchsize, time))
+      for i in job_list:
+        print i
+      #cmdfileinfo = tempfile.mkstemp(dir='./')
+      #cmdfile = open(cmdfileinfo[1], 'w')
+      #cmdfile.write("\n".join(job_list))
+      #cmdfile.close()
+      #execute('./MAGeTbrain/bin/qbatch --afterok_pattern %s %s %s %s ' %(depends, basename(cmdfileinfo[1]), batchsize, time))
       print "the file name is %s"  %basename(cmdfileinfo[1])
       os.remove(cmdfile.name)
   elif batch_system == 'loc':  # run locally
@@ -57,12 +43,13 @@ def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjo
 def preprocessing():
   job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]
-    complete = len(glob.glob('H*/output_lsq6/*_lsq6.mnc'))
+  for subject in listofinputs:
+    inputname = subject[0:-4] 
+    complete = len(glob.glob('*/output_lsq6/*_lsq6.mnc'))
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       num += 1
-      submit_jobs('s1_%s' % inputname, "-", './process.py preprocess %s %s' %(subject, 'brain'), job_list, 8, "2:00:00", num, count-complete)         
+      submit_jobs('s1_%s' % inputname, "something", './process.py preprocess %s %s' %(subject, 'brain'), job_list, 8, "2:00:00", num, count-complete) 
+      # fix dependency
   return 
 
  
@@ -189,7 +176,6 @@ def final_stats():
   return
 
 
-
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   #parser.add_argument("-s",
@@ -198,6 +184,7 @@ if __name__ == '__main__':
                       #help="stage to execute")
   #parser.add_argument("image", choices=['brain', 'face'], 
                       #default=['brain'], help="process brain or craniofacial structure")
+  parser.add_argument("-prefix", help= "selects a subset of inputs within the inputs directory")
   parser.add_argument("-rp", action="store_true",
                     help="run pipeline with pairwise lsq12 registrations")
   parser.add_argument("-rn", action= "store_true",
@@ -221,9 +208,39 @@ if __name__ == '__main__':
   
 
   args = parser.parse_args()
-  #stage = args.s
   batch_system = args.batch_system
   #image_type = args.image
+  prefix = args.prefix
+
+  listofinputs = []
+  inputdir = 'inputs/*%s*' % prefix
+  if prefix == None:        # when no prefix is specified, process all inputs
+    inputdir = 'inputs/*' 
+  for subject in glob.glob(inputdir):
+    listofinputs.append(basename(subject))
+  inputfile = open('inputlist.xfm', 'w')
+  inputfile.write("\n".join(listofinputs))
+  print "the prefix is %s" %prefix
+  
+  count = len(listofinputs)
+
+  for subject in listofinputs:
+    name = subject[0:-4]   # always .mnc files???
+    if not os.path.exists(name + '/'):
+      mkdirp(name)                          
+      mkdirp(name + '/NUC')                
+      mkdirp(name + '/NORM')                 
+      mkdirp(name + '/masks')              
+      mkdirp(name + '/lin_tfiles')          
+      mkdirp(name + '/output_lsq6')        
+      mkdirp(name + '/pairwise_tfiles')      
+      mkdirp(name + '/timage_lsq12')         
+      mkdirp('avgimages')                  
+      mkdirp(name + '/tfiles_nonlin')      
+      mkdirp(name + '/timages_nonlin')     
+      mkdirp(name + '/final_stats')
+    
+    
   
   if args.p:
     preprocessing()
@@ -263,33 +280,3 @@ if __name__ == '__main__':
     linavg()
     nonlinregs()
     final_stats()    
-     
-     
-     
-    #if stage == 'preprocess':
-      #preprocessing()
-    #elif stage == 'lsq12':
-      #if count > 20:
-        #nonpairwise()
-      #elif count <= 20:
-        #pairwise()
-    #elif stage == 'lsq12-n':
-      #nonpairwise()
-    #elif stage == 'lsq12-p':
-      #pairwise()
-    #elif stage == 'linavg':
-      #linavg()
-    #elif stage == 'nonlinreg':
-      #nonlinregs()
-    #elif stage == 'finalstats':
-      #print "here"
-      #final_stats()
-    #else:      # execute entire pipeline when no particular stage is specified 
-      #preprocess()
-      #if count > 20:
-        #nonpairwise()
-      #elif count <= 20:
-        #pairwise()    
-      #linavg()
-      #nonlinregs
-      #finalstats()     
