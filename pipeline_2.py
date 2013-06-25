@@ -28,11 +28,11 @@ def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjo
     if num == numjobs:       # when all commands are added to the list, submit the list
       for i in job_list:
         print i
-      #cmdfileinfo = tempfile.mkstemp(dir='./')
-      #cmdfile = open(cmdfileinfo[1], 'w')
-      #cmdfile.write("\n".join(job_list))
-      #cmdfile.close()
-      #execute('./MAGeTbrain/bin/qbatch --afterok_pattern %s %s %s %s ' %(depends, basename(cmdfileinfo[1]), batchsize, time))
+      cmdfileinfo = tempfile.mkstemp(dir='./')
+      cmdfile = open(cmdfileinfo[1], 'w')
+      cmdfile.write("\n".join(job_list))
+      cmdfile.close()
+      execute('./MAGeTbrain/bin/qbatch --afterok_pattern %s %s %s %s ' %(depends, basename(cmdfileinfo[1]), batchsize, time))
       print "the file name is %s"  %basename(cmdfileinfo[1])
       os.remove(cmdfile.name)
   elif batch_system == 'loc':  # run locally
@@ -48,7 +48,7 @@ def preprocessing():
     complete = len(glob.glob('*/output_lsq6/*_lsq6.mnc'))
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       num += 1
-      submit_jobs('s1_%s' % inputname, "something", './process.py preprocess %s %s' %(subject, 'brain'), job_list, 8, "2:00:00", num, count-complete) 
+      submit_jobs('s1_%s' % inputname, "something", './process.py preprocess %s %s' %(subject, image_type), job_list, 8, "2:00:00", num, count-complete) 
       # fix dependency
   return 
 
@@ -56,23 +56,17 @@ def preprocessing():
 def nonpairwise():         # alternative to pairwise registrations (i.e. too many inputs)          
   # randomly select an input
   targetname = random.randint(1,count)
-  if targetname < 10:
-    targetname = "H00%s" % targetname
-  elif targetname >= 10 and targetname < 100:
-    targetname = "H0%s" % targetname
-  else:
-    targetname = "H%s" % targetname
-  targetname = "H016"  
-  
+  targetname = listofinputs[targetname]
+    
   job_list = []
   submit_jobs('check_lsq6', 's1*', './process.py check_lsq6', job_list, 8, '2:00:00', 1,1)  #check preprocessing stage
   
   # STAGE 2A: lsq12 transformation of each input to a randomly selected subject (not pairwise)
   job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'):
-    sourcename = subject[7:11]     
-    complete = len(glob.glob('H*/lin_tfiles/H*_H*_lsq12.xfm'))
+  for subject in listofinputs:
+    sourcename = subject[0:-4]     
+    complete = len(glob.glob('*/lin_tfiles/*_*_lsq12.xfm'))
     if sourcename != targetname:
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         num += 1
@@ -87,9 +81,9 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
   # STAGE 3: repeat lsq12 tranformation for every original input (ex. H001_lsq6.mnc) to the "average size", then resample (wait for avgsize.mnc)
   job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'): 
-    sourcename = subject[7:11]
-    complete = len(glob.glob('H*/timage_lsq12/H*_lsq12.mnc'))   
+  for subject in listofinputs: 
+    sourcename = subject[0:-4]
+    complete = len(glob.glob('*/timage_lsq12/*_lsq12.mnc'))   
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename)):         
       num += 1
       submit_jobs('s3_%s' %sourcename, 'avgsize', './process.py lsq12reg_and_resample %s' %sourcename, job_list, 8, "2:00:00", num, count-complete)
@@ -99,23 +93,21 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
 def pairwise():
   # STAGE 2: pairwise lsq12 registrations (wait for all H*_lsq6.mnc files)
   job_list = []
-  submit_jobs('check_lsq6', 's1*', './process.py check_lsq6', job_list, 8, '1:00:00', 1,1)
-  job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'):
-    sourcename = subject[7:11]
-    for subject2 in glob.glob('inputs/*'):
-      targetname = subject2[7:11]
-      complete = len(glob.glob('H*/pairwise_tfiles/*_*_lsq12.xfm'))
+  for subject in listofinputs:
+    sourcename = subject[0:-4]
+    for subject2 in listofinputs:
+      targetname = subject2[0:-4]
+      complete = len(glob.glob('*/pairwise_tfiles/*_*_lsq12.xfm'))
       if sourcename != targetname and not os.path.exists('%s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         num += 1
-        submit_jobs('s2_%s_%s' %(sourcename[1:4], targetname[1:4]), 's1_*","check_lsq6', './process.py pairwise_reg %s %s' %(sourcename, targetname), job_list, 8, "2:00:00", num, ((count-1)*count)-complete)
+        submit_jobs('s2_%s_%s' %(sourcename[1:4], targetname[1:4]), 's1_*', './process.py pairwise_reg %s %s' %(sourcename, targetname), job_list, 8, "2:00:00", num, ((count-1)*count)-complete)
           
   # STAGE 3: xfm average & resample (wait for all the pairwise registrations)
   job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]
+  for subject in listofinputs:
+    inputname = subject[0:-4]
     complete = len(glob.glob('*/timage_lsq12/*_lsq12.mnc'))
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(inputname,inputname)):
       num += 1
@@ -136,9 +128,9 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
   # STAGE 5: nonlinear registrations & averaging (wait for previous average == targetimage)
   job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]  
-    complete = len(glob.glob('H*/timages_nonlin/*_nonlin%s.mnc' %number))
+  for subject in listofinputs:
+    inputname = subject[0:-4]  
+    complete = len(glob.glob('*/timages_nonlin/*_nonlin%s.mnc' %number))
     if not os.path.exists('%s/timages_nonlin/%s_nonlin%s.mnc' %(inputname,inputname, number)):
       num += 1
       submit_jobs('reg%s_%s' %(number, inputname[1:4]), '%s","check_lsq12' %targetimage[0:-4], './process.py nonlin_reg %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations), job_list, 8, "2:00:00", num, count-complete)
@@ -150,12 +142,29 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
   return
  
   
-    
+#def check(string):
+  #print "imported string is %s" %string
+  #string = string.split()
+  #print "string after split %s" %string
+  #for subject in listofinputs:
+    #inputname = subject[0:-4]
+    #try: 
+      #execute('minccomplete %s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)) # check for lsq12.mnc for every input
+    #except subprocess.CalledProcessError:
+      #print "here"
+      #execute("qdel reg*, nonlin*, s6*")
+      #sys.exit(1)
+  #return
+
 def nonlinregs():
   # Check completion of (pairwise or non-pairwise) lsq12 registration 
   # if unsuccessful then stop, else continue
   job_list = []
-  submit_jobs('check_lsq12', 'linavg', './process.py check_lsq12', job_list, 8, '1:00:00', 1,1)
+  string = ""
+  for subject in listofinputs:
+    string += subject
+    string += " "
+  submit_jobs('check_lsq12', 'linavg', './process.py check_lsq12 %s' %string, job_list, 8, '1:00:00', 1,1)
   nonlinreg_and_avg('1', 'timage_lsq12','lsq12','linavg.mnc', '100x1x1x1')
   nonlinreg_and_avg('2', 'timages_nonlin', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
   nonlinreg_and_avg('3', 'timages_nonlin', 'nonlin2', 'nonlin2avg.mnc', '100x5')
@@ -167,9 +176,9 @@ def final_stats():
   # STAGE 6: deformations, determinants (wait for all nonlinear registrations) 
   job_list = []
   num = 0
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]
-    complete = len(glob.glob('H*/final_stats/*_blur.mnc'))
+  for subject in listofinputs:
+    inputname = subject[0:-4]
+    complete = len(glob.glob('*/final_stats/*_blur.mnc'))
     if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
       num += 1
       submit_jobs('s6_%s' % inputname, 'reg*","check_lsq12', './process.py deformation %s' % inputname, job_list, 8, "2:00:00", num, count-complete)
@@ -182,8 +191,8 @@ if __name__ == '__main__':
                       #choices=['preprocess','lsq12', 'lsq12-p', 'lsq12-n',
                                #'linavg', 'nonlinreg', 'finalstats'],
                       #help="stage to execute")
-  #parser.add_argument("image", choices=['brain', 'face'], 
-                      #default=['brain'], help="process brain or craniofacial structure")
+  parser.add_argument("image", choices=['brain', 'face'], 
+                      default=['brain'], help="process brain or craniofacial structure")
   parser.add_argument("-prefix", help= "selects a subset of inputs within the inputs directory")
   parser.add_argument("-rp", action="store_true",
                     help="run pipeline with pairwise lsq12 registrations")
@@ -209,7 +218,7 @@ if __name__ == '__main__':
 
   args = parser.parse_args()
   batch_system = args.batch_system
-  #image_type = args.image
+  image_type = args.image
   prefix = args.prefix
 
   listofinputs = []

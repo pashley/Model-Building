@@ -15,28 +15,24 @@ def preprocess(thefile,image_type):
   themax = execute('mincstats -max ' + name + '/NUC/' + thefile + ' | cut -c20-31') 	
   themin = execute('mincstats -min ' + name + '/NUC/' + thefile + ' | cut -c20-31')
   execute ('minccalc -clob %s/NUC/%s -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s' %(name, thefile, themax, themin, name, thefile))
-  execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
-  mask = name + '_mask.mnc'
+  
   # face
   if image_type == 'face':
     # convert to nii
     execute("mnc2nii %s/NORM/%s %s/%s.nii" %(name, thefile, name, name))
     execute("sienax %s/%s.nii -d -o %s/sienax_output_tmp/" %(name, name, name))
     execute("gzip -d %s/sienax_output_tmp/I_stdmaskbrain_seg.nii.gz" %(name))
-    execute("nii2mnc %s/sienax_output_tmp/I_stdmaskbrain_seg.nii %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc")
-    execute("minccalc -expression "A[0] > 0.5" I_stdmaskbrain_seg.mnc I_stdmaskbrain_seg_discrete.mnc")
-
-
-    
-    
-    
-    
-    
-    
-      execute("minccalc -clob %s/masks/%s -expression '(-1)*A[0]' %s/masks/%s_mask_inverse.mnc" %(name, mask, name, name))
-      execute('bestlinreg -clob -lsq6 -source_mask %s/masks/%s_mask_inverse.mnc -target_mask targetmask_inv.mnc %s/NORM/%s ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, name, thefile, name, name))
+    execute("nii2mnc %s/sienax_output_tmp/I_stdmaskbrain_seg.nii %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc" %(name, name))
+    execute('minccalc -expression "A[0] > 0.5" %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc %s/sienax_output_tmp/I_stdmaskbrain_seg_discrete.mnc' %(name,name))
+    # ???? bestlinreg H001 to 
+    execute('minccalc -clob -expression "1-A[0]" %s/sienax_output_tmp/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask_inv.mnc' %(name,name)) 
+    #mincresample -byte -2 -near -like H010/NORM/H010.mnc discrete.mnc res2.mnc 
+    #execute('mincresample -byte -2 -near -like %s/sienax_output_tmp/I_stdmaskbrain_seg_discrete.mnc '
+    #execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask_inv.mnc -target_mask targetmask_inv.mnc %s/NORM/%s ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))
   # brain
   elif image_type == 'brain':
+    execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
+    mask = name + '_mask.mnc'    
     execute('bestlinreg -clob -lsq6 -source_mask %s/masks/%s -target_mask ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc %s/NORM/%s ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, mask, name, thefile, name, name))  
   resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
   
@@ -44,24 +40,17 @@ def preprocess(thefile,image_type):
   return
 
 
+
 def pairwise_reg(sourcename, targetname):
   execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc %s/output_lsq6/%s_lsq6.mnc %s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
   return
 
 
-def check_lsq6():  
-  for subject in glob.glob('inputs/'):
-    inputname = subject[7:11]
-    try:
-      execute('minccomplete %s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname))
-    except subprocess.CalledProcessError:
-      execute("qdel s2*, s3*, check*, reg*, nonlin*, s6*")
-  return 
 
-
-def check_lsq12():
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]
+def check_lsq12(string):
+  listofinputs = string.split()
+  for subject in listofinputs:
+    inputname = subject[0:-4]
     #for subject2 in glob.glob('inputs/*'):
       #targetname = subject2[7:11]
       #if targetname != inputname:
@@ -71,7 +60,7 @@ def check_lsq12():
           #execute("qdel reg*, nonlin*,s*")
           #sys.exit(1)
     try: 
-      execute('mincomplete %s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)) # check for lsq12.mnc for every input
+      execute('minccomplete %s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)) # check for lsq12.mnc for every input
     except subprocess.CalledProcessError:
       execute("qdel reg*, nonlin*, s6*")
   try: 
@@ -151,10 +140,8 @@ if __name__ == '__main__':
     preprocess(sys.argv[2], sys.argv[3])
   elif cmd == 'pairwise_reg':
     pairwise_reg(sys.argv[2], sys.argv[3])
-  elif cmd == 'check_lsq6':
-    check_lsq6()      
   elif cmd == 'check_lsq12':
-    check_lsq12()
+    check_lsq12(sys.argv[2])
   elif cmd == 'lsq12reg':
     lsq12reg(sys.argv[2], sys.argv[3])
   elif cmd == 'xfmavg_inv_resample':
