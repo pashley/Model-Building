@@ -9,34 +9,28 @@ import re
 
 
 def preprocess(thefile,image_type):
-  #thefile = basename(subject)
   name = thefile[0:-4]
   execute('nu_correct -clob inputs/%s %s/NUC/%s' %(thefile, name, thefile))
   themax = execute('mincstats -max ' + name + '/NUC/' + thefile + ' | cut -c20-31') 	
   themin = execute('mincstats -min ' + name + '/NUC/' + thefile + ' | cut -c20-31')
   execute ('minccalc -clob %s/NUC/%s -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s' %(name, thefile, themax, themin, name, thefile))
-  
+  execute("mnc2nii %s/NORM/%s %s/%s.nii" %(name, thefile, name, name))
+  execute("sienax %s/%s.nii -r -d -o %s/sienax_output_tmp/" %(name, name, name))
+  execute("gzip -d %s/sienax_output_tmp/I_stdmaskbrain_seg.nii.gz" %(name))
+  execute("nii2mnc %s/sienax_output_tmp/I_stdmaskbrain_seg.nii %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc" %(name, name))
+  execute('minccalc -expression "A[0] > 0.5" %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(name,name))
+  execute('mincresample -clob %s/masks/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask.mnc -like %s/NORM/%s.mnc' %(name,name,name,name))
   # face
   if image_type == 'face':
-    # convert to nii
-    execute("mnc2nii %s/NORM/%s %s/%s.nii" %(name, thefile, name, name))
-    execute("sienax %s/%s.nii -d -o %s/sienax_output_tmp/" %(name, name, name))
-    execute("gzip -d %s/sienax_output_tmp/I_stdmaskbrain_seg.nii.gz" %(name))
-    execute("nii2mnc %s/sienax_output_tmp/I_stdmaskbrain_seg.nii %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc" %(name, name))
-    execute('minccalc -expression "A[0] > 0.5" %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc %s/sienax_output_tmp/I_stdmaskbrain_seg_discrete.mnc' %(name,name))
-    # ???? bestlinreg H001 to 
-    execute('minccalc -clob -expression "1-A[0]" %s/sienax_output_tmp/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask_inv.mnc' %(name,name)) 
-    #mincresample -byte -2 -near -like H010/NORM/H010.mnc discrete.mnc res2.mnc 
-    #execute('mincresample -byte -2 -near -like %s/sienax_output_tmp/I_stdmaskbrain_seg_discrete.mnc '
-    #execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask_inv.mnc -target_mask targetmask_inv.mnc %s/NORM/%s ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))
+    execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NORM/%s.mnc %s/%s_facemask.mnc' %(name, name, name, name, name))
+    execute('bestlinreg -clob -lsq6 %s/%s_facemask.mnc targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, name, name))
+    execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/%s_facemask.mnc %s/output_lsq6/%s_lsq6.mnc -like targetimage.mnc' %(name, name, name, name, name, name))
   # brain
   elif image_type == 'brain':
-    execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
-    mask = name + '_mask.mnc'    
-    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/%s -target_mask ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc %s/NORM/%s ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, mask, name, thefile, name, name))  
-  resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
-  
-  #/home/mallar/models/ICBM_nl$ Display icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc -label icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc
+    #execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
+    #mask = name + '_mask.mnc'    
+    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc %s/NORM/%s ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
+    resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
   return
 
 
@@ -105,6 +99,44 @@ def mnc_avg(inputfolder,inputreg,outputname):
   return
 
 
+#emacs `which nlfit_smr_modelless`
+def modelblur(fwhm,blurnum):
+  execute('mincblur -clob -fwhm %s avgimages/linavg.mnc avgimages/linavg_%s' %(fwhm, blurnum))
+  return
+
+def inputblur(fwhm, blurnum, inputname):
+  execute('mincblur -clob -fwhm %s ../timages/%s_lsq12.mnc %s_%s' %(fwhm,inputname, inputname,blurnum))
+  return
+
+def tracc(num, itns,step, lttdiam, tfile):
+  execute('minctracc -clob -iterations %s -step %s %s %s -sub_lattice 6 -lattice_diameter %s %s %s -transformation %s H001_%s_blur.mnc avgimages/linavg_%s_blur.mnc out%s.xfm' %(itns, step,step, step, lttdiam, lttdiam, lttdiam,tfile, num, num, num))
+  return
+
+def tracc_call():
+  modelblur(16,1)
+  for subject in glob.glob('inputs/*'):
+    inputname = subject[7:11]
+    inputblur(16,1, inputname)
+    execute('minctracc -clob -iterations 30 -step 8 8 8 -sub_lattice 6 -lattice_diameter 24 24 24 %s_1_blur.mnc avgimages/linavg_1_blur.mnc %s_out1.xfm' %(inputname,inputname))
+    execute('mincresample -transformation %s_out1.xfm ../timages/%s_lsq12.mnc %stest.mnc -like ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc' %(inputname,inputname, inputname))
+  #execute('mincaverage *test.mnc traccavg1.mnc')
+  #modelblur(8,2)
+  #inputblur(8,2)
+  #tracc(2, 30, 8, 24, 'out1.xfm')
+  #modelblur(8,3)
+  #inputblur(8,3)
+  #tracc(3,30,4,12,'out2.xfm')
+  #modelblur(4,4)
+  #inputblur(4,4)
+  #tracc(4,30,4,12,'out3.xfm')
+  #modelblur(4,5)
+  #inputblur(4,5)
+  #tracc(5,10,2,6, 'out4.xfm')
+  #modelblur(2,6)
+  #inputblur(2,6)
+  #tracc(6,10,2,6,'out5.xfm')        
+  return
+
 def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
   execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
       --number-of-affine-iterations 10000x10000x10000x10000x10000 \
@@ -158,3 +190,5 @@ if __name__ == '__main__':
     nonlin_reg(sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],sys.argv[6])
   elif cmd == 'deformation':
     deformation(sys.argv[2])
+  elif cmd == 'tracc_call':
+    tracc_call()
