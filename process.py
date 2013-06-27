@@ -29,8 +29,10 @@ def preprocess(thefile,image_type):
   elif image_type == 'brain':
     #execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
     #mask = name + '_mask.mnc'    
-    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc %s/NORM/%s ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
+    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
     resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
+    # targetmask = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc
+    # targetimage = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc 
   return
 
 
@@ -84,7 +86,7 @@ def lsq12reg_and_resample(sourcename):
 
 
 def resample(xfm, inputpath, outputpath):
-  execute('mincresample -clob -transformation %s %s %s -sinc -like ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc' %(xfm, inputpath, outputpath))
+  execute('mincresample -clob -transformation %s %s %s -sinc -like ~targetimage.mnc' %(xfm, inputpath, outputpath))
   return 
 
 
@@ -112,30 +114,6 @@ def tracc(num, itns,step, lttdiam, tfile):
   execute('minctracc -clob -iterations %s -step %s %s %s -sub_lattice 6 -lattice_diameter %s %s %s -transformation %s H001_%s_blur.mnc avgimages/linavg_%s_blur.mnc out%s.xfm' %(itns, step,step, step, lttdiam, lttdiam, lttdiam,tfile, num, num, num))
   return
 
-def tracc_call():
-  modelblur(16,1)
-  for subject in glob.glob('inputs/*'):
-    inputname = subject[7:11]
-    inputblur(16,1, inputname)
-    execute('minctracc -clob -iterations 30 -step 8 8 8 -sub_lattice 6 -lattice_diameter 24 24 24 %s_1_blur.mnc avgimages/linavg_1_blur.mnc %s_out1.xfm' %(inputname,inputname))
-    execute('mincresample -transformation %s_out1.xfm ../timages/%s_lsq12.mnc %stest.mnc -like ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc' %(inputname,inputname, inputname))
-  #execute('mincaverage *test.mnc traccavg1.mnc')
-  #modelblur(8,2)
-  #inputblur(8,2)
-  #tracc(2, 30, 8, 24, 'out1.xfm')
-  #modelblur(8,3)
-  #inputblur(8,3)
-  #tracc(3,30,4,12,'out2.xfm')
-  #modelblur(4,4)
-  #inputblur(4,4)
-  #tracc(4,30,4,12,'out3.xfm')
-  #modelblur(4,5)
-  #inputblur(4,5)
-  #tracc(5,10,2,6, 'out4.xfm')
-  #modelblur(2,6)
-  #inputblur(2,6)
-  #tracc(6,10,2,6,'out5.xfm')        
-  return
 
 def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
   execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
