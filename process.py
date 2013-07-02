@@ -6,7 +6,7 @@ import os
 from utils import *
 import sys
 import re
-
+import tempfile
 
 def preprocess(thefile,image_type):
   name = thefile[0:-4]
@@ -15,10 +15,12 @@ def preprocess(thefile,image_type):
   themin = execute('mincstats -min ' + name + '/NUC/' + thefile + ' | cut -c20-31')
   execute ('minccalc -clob %s/NUC/%s -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s' %(name, thefile, themax, themin, name, thefile))
   execute("mnc2nii %s/NORM/%s %s/%s.nii" %(name, thefile, name, name))
-  execute("sienax %s/%s.nii -r -d -o %s/sienax_output_tmp/" %(name, name, name))
-  execute("gzip -d %s/sienax_output_tmp/I_stdmaskbrain_seg.nii.gz" %(name))
-  execute("nii2mnc %s/sienax_output_tmp/I_stdmaskbrain_seg.nii %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc" %(name, name))
-  execute('minccalc -expression "A[0] > 0.5" %s/sienax_output_tmp/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(name,name))
+  tmpdir = tempfile.mkdtemp(dir = '%s/' %name)
+  execute("sienax %s/%s.nii -d -o %s/%s/" %(name, name, name, tmpdir)) # -r option ??
+  execute("gzip -d %s/%s/I_stdmaskbrain_seg.nii.gz" %(name, tmpdir))
+  execute("nii2mnc %s/%s/I_stdmaskbrain_seg.nii %s/%s/I_stdmaskbrain_seg.mnc" %(name, tmpdir, name, tmpdir))
+  execute('minccalc -expression "A[0] > 0.5" %s/%s/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(name,tmpdir,name))
+  os.removedirs(tmpdir)
   execute('mincresample -clob %s/masks/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask.mnc -like %s/NORM/%s.mnc' %(name,name,name,name))
   # face
   if image_type == 'face':
@@ -27,10 +29,10 @@ def preprocess(thefile,image_type):
     execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/%s_facemask.mnc %s/output_lsq6/%s_lsq6.mnc -like targetimage.mnc' %(name, name, name, name, name, name))
   # brain
   elif image_type == 'brain':
-    #execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
-    #mask = name + '_mask.mnc'    
     execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
     resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
+    # execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
+    # mask = name + '_mask.mnc'     
     # targetmask = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc
     # targetimage = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc 
   return
@@ -86,7 +88,7 @@ def lsq12reg_and_resample(sourcename):
 
 
 def resample(xfm, inputpath, outputpath):
-  execute('mincresample -clob -transformation %s %s %s -sinc -like ~targetimage.mnc' %(xfm, inputpath, outputpath))
+  execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))
   return 
 
 
