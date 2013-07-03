@@ -57,9 +57,10 @@ def preprocessing():
  
 def nonpairwise():         # alternative to pairwise registrations (i.e. too many inputs)          
   # randomly select an input
-  targetname = random.randint(1,count)
-  targetname = listofinputs[targetname]
-    
+  target = random.randint(1,count)
+  target = listofinputs[target]
+  targetname = target[0:-4]
+  targetname = 'H005'
   
   # STAGE 2A: lsq12 transformation of each input to a randomly selected subject (not pairwise)
   job_list = []
@@ -70,13 +71,13 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
     if sourcename != targetname:
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         num += 1
-        submit_jobs('sa_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "2:00:00", num, count-complete-1)
+        submit_jobs('sa_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "2:00:00", num, count-complete-1, 'stage2a')
   
   # STAGE 2B: average all lsq12 xfm files, invert this average, resample (apply inverted averaged xfm to randomly selected subject)
   # wait for all H*_H*_lsq12.xfm files
   job_list = []
   if not os.path.exists('avgsize.mnc'):
-    submit_jobs('avgsize','sa_*', './process.py xfmavg_inv_resample %s' %targetname, job_list, 8, "2:00:00", 1, 1) 
+    submit_jobs('avgsize','sa_*', './process.py xfmavg_inv_resample %s' %targetname, job_list, 8, "2:00:00", 1, 1,'avgsize') 
    
   # STAGE 3: repeat lsq12 tranformation for every original input (ex. H001_lsq6.mnc) to the "average size", then resample (wait for avgsize.mnc)
   job_list = []
@@ -86,7 +87,7 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
     complete = len(glob.glob('*/timage_lsq12/*_lsq12.mnc'))   
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename)):         
       num += 1
-      submit_jobs('s3_%s' %sourcename, 'avgsize*', './process.py lsq12reg_and_resample %s' %sourcename, job_list, 8, "2:00:00", num, count-complete)
+      submit_jobs('s3_%s' %sourcename, 'avgsize*', './process.py lsq12reg_and_resample %s' %sourcename, job_list, 8, "2:00:00", num, count-complete, 'stage3')
   return  
     
  
@@ -181,8 +182,8 @@ if __name__ == '__main__':
                       #choices=['preprocess','lsq12', 'lsq12-p', 'lsq12-n',
                                #'linavg', 'nonlinreg', 'finalstats'],
                       #help="stage to execute")
-  parser.add_argument("image", choices=['brain', 'face'], 
-                      default=['brain'], help="process brain or craniofacial structure")
+  parser.add_argument("-face", action="store_true",
+                      help="craniofacial structure (default brain)")
   parser.add_argument("-prefix", help= "selects a subset of inputs within the inputs directory")
   parser.add_argument("-rp", action="store_true",
                     help="run pipeline with pairwise lsq12 registrations")
@@ -202,15 +203,19 @@ if __name__ == '__main__':
                       help="4 nonlinear registrations: (mincANTS, resample, average)x4")
   parser.add_argument("-f", action="store_true",
                       help="final stats: deformation fields, determinant")
-  parser.add_argument("-minctracc", action="store_true",
-                      help='minctracc')
+  #parser.add_argument("-minctracc", action="store_true",
+                      #help='minctracc')
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
                       help="batch system to process jobs")
     
 
   args = parser.parse_args()
   batch_system = args.batch_system
-  image_type = args.image
+  if args.face:
+    image_type = 'face'
+  else:
+    image_type = 'brain'
+  #image_type = args.image
   prefix = args.prefix
 
   listofinputs = []

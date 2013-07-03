@@ -75,14 +75,15 @@ def lsq12reg(sourcename, targetname):
 
    
 def xfmavg_inv_resample(targetname):
-  execute('xfmavg -clob H*/lin_tfiles/H*_H*_lsq12.xfm lsq12avg.xfm')
+  execute('xfmavg -clob */lin_tfiles/*_*_lsq12.xfm lsq12avg.xfm')
   execute('xfminvert -clob lsq12avg.xfm lsq12avg_inverse.xfm')
   resample('lsq12avg_inverse.xfm','%s/output_lsq6/%s_lsq6.mnc' %(targetname, targetname), 'avgsize.mnc')
   return 
 
 
 def lsq12reg_and_resample(sourcename):
-  lsq12reg('%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), 'avgsize.mnc', '%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename))
+  execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc avgsize.mnc %s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename, sourcename, sourcename))
+  #lsq12reg('%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), 'avgsize.mnc', '%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename))
   resample('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), '%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename))
   return
 
@@ -99,7 +100,7 @@ def xfmavg_and_resample(inputname):
 
 
 def mnc_avg(inputfolder,inputreg,outputname):
-  execute('mincaverage -clob H0*/%s/H0*_%s.mnc avgimages/%s' %(inputfolder,inputreg,outputname))
+  execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder,inputreg,outputname))
   return
 
 
