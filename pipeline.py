@@ -67,13 +67,14 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
     if sourcename != targetname:
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         num += 1
-        submit_jobs('sa_%s_%s' %(sourcename[0:-4], targetname[0:-4]), 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "2:00:00", num, count-complete-1, 'stage2a')
+        submit_jobs('s2', 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "2:00:00", num, count-complete-1, 'stage2a')
+        #submit_jobs('sa_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "2:00:00", num, count-complete-1, 'stage2a')
   
   # STAGE 2B: average all lsq12 xfm files, invert this average, resample (apply inverted averaged xfm to randomly selected subject)
   # wait for all H*_H*_lsq12.xfm files
   job_list = []
   if not os.path.exists('avgsize.mnc'):
-    submit_jobs('avgsize','sa_*', './process.py xfmavg_inv_resample %s' %targetname, job_list, 8, "2:00:00", 1, 1,'avgsize') 
+    submit_jobs('avgsize','s2_*', './process.py xfmavg_inv_resample %s' %targetname, job_list, 8, "2:00:00", 1, 1,'avgsize') 
    
   # STAGE 3: repeat lsq12 tranformation for every original input (ex. H001_lsq6.mnc) to the "average size", then resample (wait for avgsize.mnc)
   job_list = []
