@@ -15,6 +15,7 @@ def preprocess(thefile,image_type):
   themin = execute('mincstats -min ' + name + '/NUC/' + thefile + ' | cut -c20-31')
   execute ('minccalc -clob %s/NUC/%s -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s' %(name, thefile, themax, themin, name, thefile))
   execute("mnc2nii %s/NORM/%s %s/%s.nii" %(name, thefile, name, name))
+  # use sienax to generate mask
   tmpdir = tempfile.mkdtemp(dir = '%s/' %name)
   execute("sienax %s/%s.nii -d -o %s/%s/" %(name, name, name, tmpdir)) # -r option ??
   execute("gzip -d %s/%s/I_stdmaskbrain_seg.nii.gz" %(name, tmpdir))
@@ -28,7 +29,7 @@ def preprocess(thefile,image_type):
     execute('bestlinreg -clob -lsq6 %s/%s_facemask.mnc targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, name, name))
     execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/%s_facemask.mnc %s/output_lsq6/%s_lsq6.mnc -like targetimage.mnc' %(name, name, name, name, name, name))
   # brain
-  elif image_type == 'brain':
+  else:
     execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
     resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
     # execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
@@ -105,17 +106,21 @@ def mnc_avg(inputfolder,inputreg,outputname):
 
 
 #emacs `which nlfit_smr_modelless`
-def modelblur(fwhm,blurnum):
-  execute('mincblur -clob -fwhm %s avgimages/linavg.mnc avgimages/linavg_%s' %(fwhm, blurnum))
-  return
+#def modelblur(fwhm,blurnum):
+  #execute('mincblur -clob -fwhm %s avgimages/linavg.mnc avgimages/linavg_%s' %(fwhm, blurnum))
+  #return
 
-def inputblur(fwhm, blurnum, inputname):
-  execute('mincblur -clob -fwhm %s ../timages/%s_lsq12.mnc %s_%s' %(fwhm,inputname, inputname,blurnum))
-  return
+#def inputblur(fwhm, blurnum, inputname):
+  #execute('mincblur -clob -fwhm %s ../timages/%s_lsq12.mnc %s_%s' %(fwhm,inputname, inputname,blurnum))
+  #return
 
-def tracc(num, itns,step, lttdiam, tfile):
-  execute('minctracc -clob -iterations %s -step %s %s %s -sub_lattice 6 -lattice_diameter %s %s %s -transformation %s H001_%s_blur.mnc avgimages/linavg_%s_blur.mnc out%s.xfm' %(itns, step,step, step, lttdiam, lttdiam, lttdiam,tfile, num, num, num))
-  return
+#def tracc(num, itns,step, lttdiam, tfile):
+  #if num == 1:
+    #execute('minctracc -clob -iterations %s -step %s %s %s -sub_lattice 6 -lattice_diameter %s %s %s ')
+    #execute('minctracc -clob -iterations %s -step %s %s %s -sub_lattice 6 -lattice_diameter %s %s %s -transformation %s H001_%s_blur.mnc avgimages/linavg_%s_blur.mnc out%s.xfm' %(itns, step,step, step, lttdiam, lttdiam, lttdiam,tfile, num, num, num))
+  #return
+
+
 
 
 def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
@@ -171,5 +176,3 @@ if __name__ == '__main__':
     nonlin_reg(sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],sys.argv[6])
   elif cmd == 'deformation':
     deformation(sys.argv[2])
-  elif cmd == 'tracc_call':
-    tracc_call()
