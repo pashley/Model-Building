@@ -160,8 +160,9 @@ def tracc(inputname, num, fwhm, iterations, step, model):
       -similarity 0.3 \
       -transformation %s/minctracc_out/%s_out%s.xfm \
       %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' %(iterations, step,step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
+    execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, int(num)-1, inputname, inputname, num))
       
-    execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm %s/minctracc_out/%s_nlin%s.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, int(num)-1, inputname, inputname, num))
+    #execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm %s/minctracc_out/%s_nlin%s.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, int(num)-1, inputname, inputname, num))
   return
 
 #emacs `which nlfit_smr_modelless`  

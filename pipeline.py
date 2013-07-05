@@ -174,27 +174,29 @@ def tracc_resmp(num, fwhm, iterations, step, model):
   # CHECK num, num_jobs, complete...
   job_list = []
   if not os.path.exists('avgimages/nonlin%savg.mnc' %num):
-    
+    #submit_jobs('blurmod%s' %num, "linavg*",'mincblur -clob -fwhm %s avgimages/%s avgimages/%s_' %(fwhm,model,model[0:-4],fwhm), job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)    
     if num == 1:
       submit_jobs('blurmod%s' %num, "linavg*",
-                'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]), 
-                job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)
+                  'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
+                  job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)
     else:
-      submit_jobs('blurmod%s' %num, "nonlin%savg*" %(int(num)-1) ,
-                'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]), 
-                job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)
+      submit_jobs('blurmod%s' %num, "nonlin%savg*" %(int(num)-1), 
+                  'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
+                  job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)
     job_list = []  
     for subject in listofinputs:
       inputname = subject[0:-4]
       complete = len(glob.glob('*/minctracc_out/*_nlin%s.mnc' %num))
-      submit_jobs('tracc%s_%s' %(num, inputname), 'blurmod%s' %num,
-                './process.py tracc %s %s %s %s %s %s' %(inputname, num, fwhm, iterations, step, model), 
-                job_list, 8, "2:00:00", num, count-complete, 'minctracc')
-    jobs_list = []
-    submit_jobs('nonlin%savg' %num, 'tracc%s_*' %num, 
-              'mincaverage -clob H*/minctracc_out/*nlin%s.mnc avgimages/nonlin%savg.mnc' %(num, num), 
-              job_list, 8, "1:00:00", 1,1,'nlavg%s'%num)
+      submit_jobs('tr%s_%s' %(num, inputname[2:4]), 'blurmod%s' %num,
+                  './process.py tracc %s %s %s %s %s %s' %(inputname, num, fwhm, iterations, step, model),
+                  job_list, 8, "2:00:00", num, count-complete, 'minctracc')
+    job_list = []
+    #submit_jobs('nonlin%savg' %num, 'tracc%s*' %num,
+                #'mincaverage -clob H*/minctracc_out/*nlin%s.mnc avgimages/nonlin%savg.mnc' %(num, num),
+                #job_list, 8, "1:00:00", 1,1,'nlavg%s'%num)
+    submit_jobs('nonlin%savg' %num, 'tr%s*' %num,'./process.py mnc_avg minctracc_out nlin%s nonlin%savg.mnc' %(num, num), job_list, 8, "1:00:00", 1,1,'nlavg%s'%num)    
   return
+
 
 
 def call_tracc():
@@ -202,13 +204,15 @@ def call_tracc():
     inputname = subject[0:-4]   # always .mnc files???                          
     mkdirp(inputname + '/minctracc_out')   
   tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
-  tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
-  tracc_resmp(3, 8, 30, 4, 'nonlin2avg.mnc') 
-  tracc_resmp(4, 4, 30, 4, 'nonlin3avg.mnc')
+  #tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
+  #tracc_resmp(3, 8, 30, 4, 'nonlin2avg.mnc') 
+  #tracc_resmp(4, 4, 30, 4, 'nonlin3avg.mnc')
   #tracc_resmp(5, 4, 10, 2, 'nonlin4avg.mnc')
   #tracc_resmp(6, 2, 10, 2, 'nonlin5avg.mnc')  
   return
 
+def check_input_list():
+  return
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -219,17 +223,12 @@ if __name__ == '__main__':
   parser.add_argument("-face", action="store_true",
                       help="craniofacial structure (default brain)")
   parser.add_argument("-prefix", help= "selects a subset of inputs within the inputs directory")
+  parser.add_argument("-check_inputs", action="store_true",
+                      help="check list of inputs to be processed")
   parser.add_argument("-rp", action="store_true",
                     help="run pipeline with pairwise lsq12 registrations")
   parser.add_argument("-rn", action= "store_true",
                       help="run pipeline with non-pairwise lsq12 registrations")
-  parser.add_argument("-r", choices=['pw','npw',"mtracc", 'pwtr','npwtr'],
-                      help ="run pipeline with:\n \
-                      pw = pairwise lsq12 registrations \n \
-                      nw = nonpairwise lsq12 registrations \n \
-                      tr = minctracc nonlinear registrations \n \
-                      pwtr = pairwise lsq12 registrations & minctracc \n \
-                      npwtr = nonpairwise lsq12 registrations & minctracc")
   parser.add_argument("-p", action="store_true", 
                       help="preprocessing: correct, normalize, mask, lsq6, resample")
   parser.add_argument("-lsq12",action="store_true",
@@ -248,6 +247,7 @@ if __name__ == '__main__':
                       help="final stats: deformation fields, determinant")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
                       help="batch system to process jobs")
+  
     
 
   args = parser.parse_args()
@@ -268,7 +268,9 @@ if __name__ == '__main__':
   inputfile = open('inputlist.xfm', 'w')
   inputfile.write("\n".join(listofinputs))
 
-  
+  if args.check_inputs:
+    sys.exit(1)
+    
   count = len(listofinputs)  # number of inputs to process
 
   for subject in listofinputs:
@@ -320,8 +322,6 @@ if __name__ == '__main__':
     final_stats()
   elif args.tracc:
     call_tracc()
-  elif args.r == "pw":
-    print "pairwise registrations"
   else:                  # execute all stages when no particular stage is specified
     preprocessing()
     if count > 20:       # method of lsq12 registrations depends on # of inputs
