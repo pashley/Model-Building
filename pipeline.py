@@ -170,7 +170,44 @@ def final_stats():
   # dependency ???
   return
 
+def tracc_resmp(num, fwhm, iterations, step, model):
+  # CHECK num, num_jobs, complete...
+  job_list = []
+  if not os.path.exists('avgimages/nonlin%savg.mnc' %num):
+    
+    if num == 1:
+      submit_jobs('blurmod%s' %num, "linavg*",
+                'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]), 
+                job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)
+    else:
+      submit_jobs('blurmod%s' %num, "nonlin%savg*" %(int(num)-1) ,
+                'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]), 
+                job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)
+    job_list = []  
+    for subject in listofinputs:
+      inputname = subject[0:-4]
+      complete = len(glob.glob('*/minctracc_out/*_nlin%s.mnc' %num))
+      submit_jobs('tracc%s_%s' %(num, inputname), 'blurmod%s' %num,
+                './process.py tracc %s %s %s %s %s %s' %(inputname, num, fwhm, iterations, step, model), 
+                job_list, 8, "2:00:00", num, count-complete, 'minctracc')
+    jobs_list = []
+    submit_jobs('nonlin%savg' %num, 'tracc%s_*' %num, 
+              'mincaverage -clob H*/minctracc_out/*nlin%s.mnc avgimages/nonlin%savg.mnc' %(num, num), 
+              job_list, 8, "1:00:00", 1,1,'nlavg%s'%num)
+  return
 
+
+def call_tracc():
+  for subject in listofinputs:
+    inputname = subject[0:-4]   # always .mnc files???                          
+    mkdirp(inputname + '/minctracc_out')   
+  tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
+  tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
+  tracc_resmp(3, 8, 30, 4, 'nonlin2avg.mnc') 
+  tracc_resmp(4, 4, 30, 4, 'nonlin3avg.mnc')
+  #tracc_resmp(5, 4, 10, 2, 'nonlin4avg.mnc')
+  #tracc_resmp(6, 2, 10, 2, 'nonlin5avg.mnc')  
+  return
 
 
 if __name__ == '__main__':
@@ -185,7 +222,14 @@ if __name__ == '__main__':
   parser.add_argument("-rp", action="store_true",
                     help="run pipeline with pairwise lsq12 registrations")
   parser.add_argument("-rn", action= "store_true",
-                      help="run pipeline with non-pairwise lsq12 registrations")                    
+                      help="run pipeline with non-pairwise lsq12 registrations")
+  parser.add_argument("-r", choices=['pw','npw',"mtracc", 'pwtr','npwtr'],
+                      help ="run pipeline with:\n \
+                      pw = pairwise lsq12 registrations \n \
+                      nw = nonpairwise lsq12 registrations \n \
+                      tr = minctracc nonlinear registrations \n \
+                      pwtr = pairwise lsq12 registrations & minctracc \n \
+                      npwtr = nonpairwise lsq12 registrations & minctracc")
   parser.add_argument("-p", action="store_true", 
                       help="preprocessing: correct, normalize, mask, lsq6, resample")
   parser.add_argument("-lsq12",action="store_true",
@@ -196,12 +240,12 @@ if __name__ == '__main__':
                       help="non-pairwise lsq12 registrations")
   parser.add_argument("-a",action="store_true", 
                       help="average linearly processed images")
+  parser.add_argument("-tracc",action="store_true",
+                      help="minctracc")
   parser.add_argument("-n", action="store_true", 
                       help="4 nonlinear registrations: (mincANTS, resample, average)x4")
   parser.add_argument("-f", action="store_true",
                       help="final stats: deformation fields, determinant")
-  #parser.add_argument("-minctracc", action="store_true",
-                      #help='minctracc')
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
                       help="batch system to process jobs")
     
@@ -239,8 +283,8 @@ if __name__ == '__main__':
       mkdirp(name + '/pairwise_tfiles')      
       mkdirp(name + '/timage_lsq12')         
       mkdirp('avgimages')                  
-      mkdirp(name + '/tfiles_nonlin')      
-      mkdirp(name + '/timages_nonlin')     
+      mkdirp(name + '/tfiles_nonlin')      # don't need when minctracc
+      mkdirp(name + '/timages_nonlin')     # don't need when minctracc
       mkdirp(name + '/final_stats')
     
     
@@ -274,6 +318,10 @@ if __name__ == '__main__':
     linavg()
     nonlinregs()
     final_stats()
+  elif args.tracc:
+    call_tracc()
+  elif args.r == "pw":
+    print "pairwise registrations"
   else:                  # execute all stages when no particular stage is specified
     preprocessing()
     if count > 20:       # method of lsq12 registrations depends on # of inputs

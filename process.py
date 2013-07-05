@@ -17,10 +17,10 @@ def preprocess(thefile,image_type):
   execute("mnc2nii %s/NORM/%s %s/%s.nii" %(name, thefile, name, name))
   # use sienax to generate mask
   tmpdir = tempfile.mkdtemp(dir = '%s/' %name)
-  execute("sienax %s/%s.nii -d -o %s/%s/" %(name, name, name, tmpdir)) # -r option ??
-  execute("gzip -d %s/%s/I_stdmaskbrain_seg.nii.gz" %(name, tmpdir))
-  execute("nii2mnc %s/%s/I_stdmaskbrain_seg.nii %s/%s/I_stdmaskbrain_seg.mnc" %(name, tmpdir, name, tmpdir))
-  execute('minccalc -expression "A[0] > 0.5" %s/%s/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(name,tmpdir,name))
+  execute("sienax %s/%s.nii -d -o %s" %(name, name, tmpdir)) # -r option ??
+  execute("gzip -d %s/I_stdmaskbrain_seg.nii.gz" %(tmpdir))
+  execute("nii2mnc %s/I_stdmaskbrain_seg.nii %s/I_stdmaskbrain_seg.mnc" %(tmpdir, tmpdir))
+  execute('minccalc -cl-expression "A[0] > 0.5" %s/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(tmpdir,name))
   os.removedirs(tmpdir)
   execute('mincresample -clob %s/masks/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask.mnc -like %s/NORM/%s.mnc' %(name,name,name,name))
   # face
@@ -105,24 +105,6 @@ def mnc_avg(inputfolder,inputreg,outputname):
   return
 
 
-#emacs `which nlfit_smr_modelless`
-#def modelblur(fwhm,blurnum):
-  #execute('mincblur -clob -fwhm %s avgimages/linavg.mnc avgimages/linavg_%s' %(fwhm, blurnum))
-  #return
-
-#def inputblur(fwhm, blurnum, inputname):
-  #execute('mincblur -clob -fwhm %s ../timages/%s_lsq12.mnc %s_%s' %(fwhm,inputname, inputname,blurnum))
-  #return
-
-#def tracc(num, itns,step, lttdiam, tfile):
-  #if num == 1:
-    #execute('minctracc -clob -iterations %s -step %s %s %s -sub_lattice 6 -lattice_diameter %s %s %s ')
-    #execute('minctracc -clob -iterations %s -step %s %s %s -sub_lattice 6 -lattice_diameter %s %s %s -transformation %s H001_%s_blur.mnc avgimages/linavg_%s_blur.mnc out%s.xfm' %(itns, step,step, step, lttdiam, lttdiam, lttdiam,tfile, num, num, num))
-  #return
-
-
-
-
 def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
   execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
       --number-of-affine-iterations 10000x10000x10000x10000x10000 \
@@ -149,7 +131,40 @@ def deformation(inputname):
   execute('mincblob -determinant %s/final_stats/%s_inversegrid.mnc %s/final_stats/%s_det.mnc' %(inputname, inputname, inputname, inputname))
   execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' %(inputname, inputname, inputname, inputname))  
   return
-  
+
+
+def tracc(inputname, num, fwhm, iterations, step, model):
+  lttdiam = int(step)*3
+  # change path for lsq12 images!!!!   %s/timage_lsq12/%s_lsq12.mnc
+  if not os.path.exists('%s/minctracc_out/%s_lsq12_%s_blur.mnc' %(inputname, inputname,fwhm)):
+    execute('mincblur -clob -fwhm %s ../timages/%s_lsq12.mnc %s/minctracc_out/%s_lsq12_%s' %(fwhm, inputname, inputname, inputname,fwhm))
+  if num == '1':     # no -transformation option for first minctracc
+    execute('minctracc -clob -nonlinear corrcoeff \
+        -iterations 30 \
+        -step 8 8 8 \
+        -sub_lattice 6 \
+        -lattice_diameter 24 24 24 \
+        -stiffness 1 \
+        -weight 1 \
+        -similarity 0.3 \
+        %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/linavg_blur.mnc %s/minctracc_out/%s_out1.xfm' %(inputname, inputname, fwhm, inputname, inputname))
+    execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
+  else:
+    execute('minctracc -clob -nonlinear corrcoeff \
+      -iterations %s \
+      -step %s %s %s \
+      -sub_lattice 6 \
+      -lattice_diameter %s %s %s \
+      -stiffness 1 \
+      -weight 1 \
+      -similarity 0.3 \
+      -transformation %s/minctracc_out/%s_out%s.xfm \
+      %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' %(iterations, step,step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
+      
+    execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm %s/minctracc_out/%s_nlin%s.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, int(num)-1, inputname, inputname, num))
+  return
+
+#emacs `which nlfit_smr_modelless`  
     
 if __name__ == '__main__':
   cmd = sys.argv[1]
@@ -176,3 +191,5 @@ if __name__ == '__main__':
     nonlin_reg(sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],sys.argv[6])
   elif cmd == 'deformation':
     deformation(sys.argv[2])
+  elif cmd == 'tracc':
+    tracc(sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],sys.argv[6],sys.argv[7])
