@@ -7,8 +7,9 @@ from utils import *
 import sys
 import re
 import tempfile
+import shutil
 
-def preprocess(thefile,image_type):
+def preprocess(thefile, image_type, target_type):
   name = thefile[0:-4]
   execute('nu_correct -clob inputs/%s %s/NUC/%s' %(thefile, name, thefile))
   themax = execute('mincstats -max ' + name + '/NUC/' + thefile + ' | cut -c20-31') 	
@@ -20,18 +21,22 @@ def preprocess(thefile,image_type):
   execute("sienax %s/%s.nii -d -o %s" %(name, name, tmpdir)) # -r option ??
   execute("gzip -d %s/I_stdmaskbrain_seg.nii.gz" %(tmpdir))
   execute("nii2mnc %s/I_stdmaskbrain_seg.nii %s/I_stdmaskbrain_seg.mnc" %(tmpdir, tmpdir))
-  execute('minccalc -cl-expression "A[0] > 0.5" %s/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(tmpdir,name))
-  os.removedirs(tmpdir)
+  execute('minccalc -clob -expression "A[0] > 0.5" %s/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(tmpdir,name))
+  shutil.rmtree(tmpdir)
   execute('mincresample -clob %s/masks/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask.mnc -like %s/NORM/%s.mnc' %(name,name,name,name))
-  # face
-  if image_type == 'face':
-    execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NORM/%s.mnc %s/%s_facemask.mnc' %(name, name, name, name, name))
-    execute('bestlinreg -clob -lsq6 %s/%s_facemask.mnc targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, name, name))
-    execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/%s_facemask.mnc %s/output_lsq6/%s_lsq6.mnc -like targetimage.mnc' %(name, name, name, name, name, name))
-  # brain
-  else:
-    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
-    resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
+  if target_type == 'given':
+    # face
+    if image_type == 'face':
+      execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NORM/%s.mnc %s/%s_face.mnc' %(name, name, name, name, name))
+      execute('bestlinreg -clob -lsq6 %s/%s_face.mnc targetfaceimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name,name, name))
+      execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/%s_face.mnc %s/output_lsq6/%s_lsq6.mnc -sinc -like targetfaceimage.mnc' %(name, name, name, name, name, name))
+ 
+    # brain
+    else:
+      execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
+      resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
+  
+    
     # execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
     # mask = name + '_mask.mnc'     
     # targetmask = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc
@@ -43,7 +48,6 @@ def preprocess(thefile,image_type):
 def pairwise_reg(sourcename, targetname):
   execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc %s/output_lsq6/%s_lsq6.mnc %s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
   return
-
 
 
 def lsq12reg(sourcename, targetname):
@@ -125,15 +129,21 @@ def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
   
   
 def deformation(inputname):
-  #/projects/utilities/xfmjoin
-  execute('xfmjoin %s/tfiles_nonlin/%s_nonlin1.xfm %s/tfiles_nonlin/%s_nonlin2.xfm %s/tfiles_nonlin/%s_nonlin3.xfm %s/tfiles_nonlin/%s_nonlin4.xfm %s/%s_merged2.xfm' %(inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname))
-  outputfile = open('%s/%s_merged.xfm' %(inputname,inputname), 'w')
-  info = open('%s/%s_merged2.xfm' %(inputname,inputname)).read()
-  outputfile.write(re.sub("= %s/" %inputname, "= ",info))
-  outputfile.close()
-  os.remove('%s/%s_merged2.xfm' %(inputname,inputname))
-  execute('minc_displacement %s/timage_lsq12/%s_lsq12.mnc %s/%s_merged.xfm %s/final_stats/%s_grid.mnc' %(inputname, inputname, inputname, inputname, inputname, inputname))
-  execute('minccalc -clob %s/final_stats/%s_grid.mnc -expression "-1*A[0]" %s/final_stats/%s_inversegrid.mnc' %(inputname, inputname, inputname, inputname))
+  # /projects/utilities/xfmjoin
+  try:
+    # assume minctracc was executed 
+    execute('minccalc -clob %s/minctracc_out/%s_out6_grid* -expression "-1*A[0]" %s/final_stats/%s_inversegrid.mnc' %(inputname, inputname, inputname, inputname))
+  except subprocess.CalledProcessError:
+    # can't access minctracc output files, so assume mincANTS was executed
+    execute('xfmjoin %s/tfiles_nonlin/%s_nonlin1.xfm %s/tfiles_nonlin/%s_nonlin2.xfm %s/tfiles_nonlin/%s_nonlin3.xfm %s/tfiles_nonlin/%s_nonlin4.xfm %s/%s_merged2.xfm' %(inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname))
+    outputfile = open('%s/%s_merged.xfm' %(inputname,inputname), 'w')
+    info = open('%s/%s_merged2.xfm' %(inputname,inputname)).read()
+    outputfile.write(re.sub("= %s/" %inputname, "= ",info))
+    outputfile.close()
+    os.remove('%s/%s_merged2.xfm' %(inputname,inputname))
+    execute('minc_displacement %s/timage_lsq12/%s_lsq12.mnc %s/%s_merged.xfm %s/final_stats/%s_grid.mnc' %(inputname, inputname, inputname, inputname, inputname, inputname))
+    execute('minccalc -clob %s/final_stats/%s_grid.mnc -expression "-1*A[0]" %s/final_stats/%s_inversegrid.mnc' %(inputname, inputname, inputname, inputname))
+  
   execute('mincblob -determinant %s/final_stats/%s_inversegrid.mnc %s/final_stats/%s_det.mnc' %(inputname, inputname, inputname, inputname))
   execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' %(inputname, inputname, inputname, inputname))  
   return
@@ -175,7 +185,7 @@ if __name__ == '__main__':
   cmd = sys.argv[1]
   
   if cmd == 'preprocess':
-    preprocess(sys.argv[2], sys.argv[3])
+    preprocess(sys.argv[2], sys.argv[3], sys.argv[4])
   elif cmd == 'pairwise_reg':
     pairwise_reg(sys.argv[2], sys.argv[3])
   elif cmd == 'linavg_and_check':

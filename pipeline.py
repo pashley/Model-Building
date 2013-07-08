@@ -11,8 +11,6 @@ import tempfile
 
 
         
-
-
 def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjobs, name_file): 
   if batch_system == 'sge':
     execute('sge_batch -J %s -H "%s" %s' %(jobname, depends, command))
@@ -46,7 +44,7 @@ def preprocessing():
     complete = len(glob.glob('*/output_lsq6/*_lsq6.mnc'))
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       num += 1
-      submit_jobs('s1_%s' %inputname, "something", './process.py preprocess %s %s' %(subject, image_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess') 
+      submit_jobs('s1_%s' %inputname, "something", './process.py preprocess %s %s %s' %(subject, image_type, target_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess') 
       # fix dependency
   return 
 
@@ -57,7 +55,6 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
   target = listofinputs[target]
   targetname = target[0:-4]
 
-  
   # STAGE 2A: lsq12 transformation of each input to a randomly selected subject (not pairwise)
   job_list = []
   num = 0
@@ -199,6 +196,7 @@ def call_tracc():
   for subject in listofinputs:
     inputname = subject[0:-4]                             
     mkdirp(inputname + '/minctracc_out')   
+  #tracc_resmp(stage, Gaussian blur, iterations, step size, model name) 
   tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
   tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
   tracc_resmp(3, 8, 30, 4, 'nonlin2avg.mnc') 
@@ -225,6 +223,10 @@ if __name__ == '__main__':
                       help="run pipeline with non-pairwise lsq12 registrations")
   parser.add_argument("-rt", action="store_true",
                       help="run pipeline with minctracc")
+  parser.add_argument("-rpt", action="store_true",
+                      help="run pipeline with pairwise lsq12 registrations and minctracc")
+  parser.add_argument("-rnt", action="store_true", 
+                      help="run pipeline with non-pairwise lsq12 registrations and minctracc")
   parser.add_argument("-p", action="store_true", 
                       help="preprocessing: correct, normalize, mask, lsq6, resample")
   parser.add_argument("-lsq12",action="store_true",
@@ -236,13 +238,15 @@ if __name__ == '__main__':
   parser.add_argument("-a",action="store_true", 
                       help="average linearly processed images")
   parser.add_argument("-tracc",action="store_true",
-                      help="minctracc nonlinear transformations (6 iterations with preset parameters")
+                      help="minctracc nonlinear transformations (6 iterations with preset parameters)")
   parser.add_argument("-n", action="store_true", 
                       help="4 nonlinear registrations: (mincANTS, resample, average)x4")
   parser.add_argument("-f", action="store_true",
                       help="final stats: deformation fields, determinant")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
                       help="batch system to process jobs")
+  parser.add_argument("-random_target", action="store_true",
+                      help="radomly select one input to be target image for linear registrations")
   
   # fix option above !!! ^^^   
 
@@ -253,6 +257,12 @@ if __name__ == '__main__':
   else:
     image_type = 'brain'
   #image_type = args.image
+  
+  if args.random_target():
+    target_type = 'random'
+  else:
+    target_type = 'given'  
+  
   prefix = args.prefix
 
   listofinputs = []
@@ -286,7 +296,10 @@ if __name__ == '__main__':
       mkdirp(name + '/final_stats')
     
     
-  
+
+    
+   
+    
   if args.p:
     preprocessing()
   elif args.lsq12:
@@ -304,18 +317,30 @@ if __name__ == '__main__':
     nonlinregs()
   elif args.f:
     final_stats()
-  elif args.rp:
+  elif args.rp:         # run pipeline with pairwise & mincANTS
     preprocessing()
     pairwise()
     linavg()
     nonlinregs()
     final_stats()
-  elif args.rn:
+  elif args.rn:         # run pipeline with nonpairwise & mincANTS
     preprocessing()
     nonpairwise()
     linavg()
     nonlinregs()
     final_stats()
+  elif args.rpt:        # run pipeline with pairwise & minctracc
+    preprocessing()
+    pairwise()
+    linavg()
+    call_tracc()
+    final_stats()
+  elif args.rpt:        # run pipeline with nonpairwise & minctracc   
+    preprocessing()
+    nonpairwise()
+    linavg()
+    call_tracc()
+    final_stats()  
   elif args.tracc:
     call_tracc()
   else:                  # execute all stages when no particular stage is specified
