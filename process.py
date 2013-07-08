@@ -46,30 +46,6 @@ def pairwise_reg(sourcename, targetname):
 
 
 
-def check_lsq12(string):
-  listofinputs = string.split()
-  for subject in listofinputs:
-    inputname = subject[0:-4]
-    #for subject2 in glob.glob('inputs/*'):
-      #targetname = subject2[7:11]
-      #if targetname != inputname:
-        #try:
-          #execute('minccomplete %s/pairwise_tfiles/%s_%s_lsq12.xfm' %(inputname, inputname, targetname)) # check all pairwise transformation files (necessary?)
-        #except subprocess.CalledProcessError:
-          #execute("qdel reg*, nonlin*,s*")
-          #sys.exit(1)
-    try: 
-      execute('minccomplete %s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)) # check for lsq12.mnc for every input
-    except subprocess.CalledProcessError:
-      execute("qdel reg*, nonlin*, s6*")
-  try: 
-    execute('minccomplete avgimages/linavg.mnc')   # check for average 
-  except subprocess.CalledProcessError:
-    execute("qdel reg*, nonlin*, s6*")
-    #print e.output
-  return  
-
-
 def lsq12reg(sourcename, targetname):
   execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc %s/output_lsq6/%s_lsq6.mnc %s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
   return
@@ -100,10 +76,39 @@ def xfmavg_and_resample(inputname):
   return
 
 
+def check_lsq12(string):
+  listofinputs = string.split()
+  for subject in listofinputs:
+    inputname = subject[0:-4]
+    #for subject2 in glob.glob('inputs/*'):
+      #targetname = subject2[7:11]
+      #if targetname != inputname:
+        #try:
+          #execute('minccomplete %s/pairwise_tfiles/%s_%s_lsq12.xfm' %(inputname, inputname, targetname)) # check all pairwise transformation files (necessary?)
+        #except subprocess.CalledProcessError:
+          #execute("qdel reg*, nonlin*,s*")
+          #sys.exit(1)
+    try: 
+      execute('minccomplete %s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)) # check for lsq12.mnc for every input
+    except subprocess.CalledProcessError:
+      execute("qdel reg*, nonlin*, s6*")
+  try: 
+    execute('minccomplete avgimages/linavg.mnc')   # check for average 
+  except subprocess.CalledProcessError:
+    execute("qdel reg*, nonlin*, s6*")
+    #print e.output
+  return  
+
+
+def linavg_and_check(inputfolder, inputreg, outputname, string):
+  execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder, inputreg, outputname))
+  check_lsq12(string)
+  return
+
+
 def mnc_avg(inputfolder,inputreg,outputname):
   execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder,inputreg,outputname))
   return
-
 
 def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
   execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
@@ -120,7 +125,8 @@ def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
   
   
 def deformation(inputname):
-  execute('/projects/utilities/xfmjoin %s/tfiles_nonlin/%s_nonlin1.xfm %s/tfiles_nonlin/%s_nonlin2.xfm %s/tfiles_nonlin/%s_nonlin3.xfm %s/tfiles_nonlin/%s_nonlin4.xfm %s/%s_merged2.xfm' %(inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname))
+  #/projects/utilities/xfmjoin
+  execute('xfmjoin %s/tfiles_nonlin/%s_nonlin1.xfm %s/tfiles_nonlin/%s_nonlin2.xfm %s/tfiles_nonlin/%s_nonlin3.xfm %s/tfiles_nonlin/%s_nonlin4.xfm %s/%s_merged2.xfm' %(inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname, inputname))
   outputfile = open('%s/%s_merged.xfm' %(inputname,inputname), 'w')
   info = open('%s/%s_merged2.xfm' %(inputname,inputname)).read()
   outputfile.write(re.sub("= %s/" %inputname, "= ",info))
@@ -148,7 +154,7 @@ def tracc(inputname, num, fwhm, iterations, step, model):
         -weight 1 \
         -similarity 0.3 \
         %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/linavg_blur.mnc %s/minctracc_out/%s_out1.xfm' %(inputname, inputname, fwhm, inputname, inputname))
-    execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
+    #execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
   else:
     execute('minctracc -clob -nonlinear corrcoeff \
       -iterations %s \
@@ -160,9 +166,7 @@ def tracc(inputname, num, fwhm, iterations, step, model):
       -similarity 0.3 \
       -transformation %s/minctracc_out/%s_out%s.xfm \
       %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' %(iterations, step,step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
-    execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
-      
-    #execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm %s/minctracc_out/%s_nlin%s.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, int(num)-1, inputname, inputname, num))
+  execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
   return
 
 #emacs `which nlfit_smr_modelless`  
@@ -174,8 +178,8 @@ if __name__ == '__main__':
     preprocess(sys.argv[2], sys.argv[3])
   elif cmd == 'pairwise_reg':
     pairwise_reg(sys.argv[2], sys.argv[3])
-  elif cmd == 'check_lsq12':
-    check_lsq12(sys.argv[2])
+  elif cmd == 'linavg_and_check':
+    check_lsq12(sys.argv[2], sys.argv[3], sys.argv[4]. sys.argv[5])
   elif cmd == 'lsq12reg':
     lsq12reg(sys.argv[2], sys.argv[3])
   elif cmd == 'xfmavg_inv_resample':

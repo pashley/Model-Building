@@ -19,15 +19,15 @@ def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjo
   elif batch_system == 'pbs':
     job_list.append(command)
     if num == numjobs:       # when all commands are added to the list, submit the list
-      #cmdfileinfo = tempfile.mkstemp(dir='./')
+      
       outputfile = open('%s' %name_file, 'w')
       outputfile.write("\n".join(job_list))
-      #outputfile.write("\n")
       outputfile.close()
       if jobname[0:2] == 's1':
         execute('qbatch -N %s %s %s %s ' %(jobname, name_file, batchsize, time))  # no dependency for first stage
       else:
         execute('qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, name_file, batchsize, time))
+      #cmdfileinfo = tempfile.mkstemp(dir='./')
       #cmdfile = open(cmdfileinfo[1], 'w')
       #cmdfile.write("\n".join(job_list))
       #cmdfile.close()
@@ -56,7 +56,7 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
   target = random.randint(1,count)
   target = listofinputs[target]
   targetname = target[0:-4]
-  #targetname = 'H005'
+
   
   # STAGE 2A: lsq12 transformation of each input to a randomly selected subject (not pairwise)
   job_list = []
@@ -114,10 +114,17 @@ def pairwise():
 
 
 def linavg():
-  # STAGE 4: mincaverage linearly processed images (wait for all H*_lsq12.mnc files)
+  # STAGE 4: mincaverage linearly processed images (wait for all H*_lsq12.mnc files) and check for successful completion of lsq12 registration stage
   job_list = []
+  string = ""
+  for subject in listofinputs:
+    string += subject
+    string += " "  
   if not os.path.exists('avgimages/linavg.mnc'):
-    submit_jobs('linavg', 's3_*', './process.py mnc_avg timage_lsq12 lsq12 linavg.mnc', job_list, 8, "1:00:00", 1, 1, 'linavg')
+    #submit_jobs('linavg', 's3_*', './process.py mnc_avg timage_lsq12 lsq12 linavg.mnc', job_list, 8, "1:00:00", 1, 1, 'linavg')
+    submit_jobs('linavg', 's3_*', './process.py linavg_and_check timage_lsq12 lsq12 linavg.mnc %s' %string, job_list, 8, "1:00:00", 1, 1, 'linavg')
+
+  #submit_jobs('check_lsq12', 'linavg', './process.py check_lsq12 %s' %string, job_list, 8, '1:00:00', 1,1)
   return
 
 
@@ -142,14 +149,6 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
   
 
 def nonlinregs():
-  # Check completion of (pairwise or non-pairwise) lsq12 registration 
-  # if unsuccessful then stop, else continue
-  job_list = []
-  string = ""
-  for subject in listofinputs:
-    string += subject
-    string += " "
-  #submit_jobs('check_lsq12', 'linavg', './process.py check_lsq12 %s' %string, job_list, 8, '1:00:00', 1,1)
   nonlinreg_and_avg('1', 'timage_lsq12','lsq12','linavg.mnc', '100x1x1x1')
   nonlinreg_and_avg('2', 'timages_nonlin', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
   nonlinreg_and_avg('3', 'timages_nonlin', 'nonlin2', 'nonlin2avg.mnc', '100x5')
@@ -170,11 +169,11 @@ def final_stats():
   # dependency ???
   return
 
+
 def tracc_resmp(num, fwhm, iterations, step, model):
   # CHECK num, num_jobs, complete...
   job_list = []
   if not os.path.exists('avgimages/nonlin%savg.mnc' %num):
-    #submit_jobs('blurmod%s' %num, "linavg*",'mincblur -clob -fwhm %s avgimages/%s avgimages/%s_' %(fwhm,model,model[0:-4],fwhm), job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)    
     if num == 1:
       submit_jobs('blurmod%s' %num, "linavg*",
                   'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
@@ -191,17 +190,14 @@ def tracc_resmp(num, fwhm, iterations, step, model):
                   './process.py tracc %s %s %s %s %s %s' %(inputname, num, fwhm, iterations, step, model),
                   job_list, 8, "2:00:00", num, count-complete, 'minctracc')
     job_list = []
-    #submit_jobs('nonlin%savg' %num, 'tracc%s*' %num,
-                #'mincaverage -clob H*/minctracc_out/*nlin%s.mnc avgimages/nonlin%savg.mnc' %(num, num),
-                #job_list, 8, "1:00:00", 1,1,'nlavg%s'%num)
-    submit_jobs('nonlin%savg' %num, 'tr%s*' %num,'./process.py mnc_avg minctracc_out nlin%s nonlin%savg.mnc' %(num, num), job_list, 8, "1:00:00", 1,1,'nlavg%s'%num)    
+    submit_jobs('nonlin%savg' %num, 'tr%s*' %num,'./process.py mnc_avg timages_nonlin nlin%s nonlin%savg.mnc' %(num, num), job_list, 8, "1:00:00", 1,1,'nlavg%s'%num)    
   return
 
 
 
 def call_tracc():
   for subject in listofinputs:
-    inputname = subject[0:-4]   # always .mnc files???                          
+    inputname = subject[0:-4]                             
     mkdirp(inputname + '/minctracc_out')   
   tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
   tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
@@ -240,15 +236,13 @@ if __name__ == '__main__':
   parser.add_argument("-a",action="store_true", 
                       help="average linearly processed images")
   parser.add_argument("-tracc",action="store_true",
-                      help="minctracc")
+                      help="minctracc nonlinear transformations (6 iterations with preset parameters")
   parser.add_argument("-n", action="store_true", 
                       help="4 nonlinear registrations: (mincANTS, resample, average)x4")
   parser.add_argument("-f", action="store_true",
                       help="final stats: deformation fields, determinant")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
                       help="batch system to process jobs")
-  parser.add_argument("-run_with",choices=["pw","npw","t","pwt", "npwt"],
-                      help="run entire pipeline with: pairwise lsq12 registrations (pw) or non-pairwise registrations (npw) or minctracc(t) or pairwise lsq12 registrations & minctracc (pwt) or non-pairwise lsq12 registrations & minctracc (npwt)")
   
   # fix option above !!! ^^^   
 
