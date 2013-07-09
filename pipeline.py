@@ -44,7 +44,7 @@ def preprocessing():
     complete = len(glob.glob('*/output_lsq6/*_lsq6.mnc'))
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       num += 1
-      submit_jobs('s1_%s' %inputname, "something", './process.py preprocess %s %s %s' %(subject, image_type, target_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess') 
+      submit_jobs('s1_%s' %inputname, "something", './process.py preprocess %s %s' %(subject, image_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess') 
       # fix dependency
   return 
 
@@ -245,8 +245,8 @@ if __name__ == '__main__':
                       help="final stats: deformation fields, determinant")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
                       help="batch system to process jobs")
-  parser.add_argument("-random_target", action="store_true",
-                      help="radomly select one input to be target image for linear registrations")
+  #parser.add_argument("-random_target", action="store_true",
+                      #help="radomly select one input to be target image for linear registrations")
   
   # fix option above !!! ^^^   
 
@@ -257,11 +257,10 @@ if __name__ == '__main__':
   else:
     image_type = 'brain'
   #image_type = args.image
-  
-  if args.random_target():
-    target_type = 'random'
-  else:
-    target_type = 'given'  
+  #if args.random_target():
+    #target_type = 'random'
+  #else:
+    #target_type = 'given'  
   
   prefix = args.prefix
 

@@ -9,7 +9,7 @@ import re
 import tempfile
 import shutil
 
-def preprocess(thefile, image_type, target_type):
+def preprocess(thefile, image_type):
   name = thefile[0:-4]
   execute('nu_correct -clob inputs/%s %s/NUC/%s' %(thefile, name, thefile))
   themax = execute('mincstats -max ' + name + '/NUC/' + thefile + ' | cut -c20-31') 	
@@ -24,24 +24,33 @@ def preprocess(thefile, image_type, target_type):
   execute('minccalc -clob -expression "A[0] > 0.5" %s/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(tmpdir,name))
   shutil.rmtree(tmpdir)
   execute('mincresample -clob %s/masks/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask.mnc -like %s/NORM/%s.mnc' %(name,name,name,name))
-  if target_type == 'given':
-    # face
-    if image_type == 'face':
-      execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NORM/%s.mnc %s/%s_face.mnc' %(name, name, name, name, name))
-      execute('bestlinreg -clob -lsq6 %s/%s_face.mnc targetfaceimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name,name, name))
-      execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/%s_face.mnc %s/output_lsq6/%s_lsq6.mnc -sinc -like targetfaceimage.mnc' %(name, name, name, name, name, name))
- 
-    # brain
-    else:
-      execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
-      resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
-  
-    
+  # face
+  if image_type == 'face':
+    execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NORM/%s.mnc %s/%s_face.mnc' %(name, name, name, name, name)) 
+    execute('bestlinreg -clob -lsq6 %s/%s_face.mnc targetfaceimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name,name, name))
+    execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/%s_face.mnc %s/output_lsq6/%s_lsq6.mnc -sinc -like targetfaceimage.mnc' %(name, name, name, name, name, name))
+  # brain
+  else:
+    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
+    resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
     # execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
     # mask = name + '_mask.mnc'     
     # targetmask = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc
     # targetimage = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc 
   return
+
+
+def preprocess_stage2(thefile, image_type,targetname):
+  name = thefile[0:-4]
+  if image_type == "face":
+    targetimage = "%s/%s_face.mnc" %(targetname,targetname)
+    execute('bestlinreg -clob -lsq6 %s/%s_face.mnc %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(name, name, targetimage, name, name, targetname)) 
+  else:
+    targetmask = "%s/masks/%s" %(targetname,targetname)
+    targetimage = "%s/NORM/%s" %(targetname, targetname)
+    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask %s %s/NORM/%s %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(name, targetmask, name, thefile, targetimage,name, name, targetname))    
+  return
+  
 
 
 
@@ -185,7 +194,7 @@ if __name__ == '__main__':
   cmd = sys.argv[1]
   
   if cmd == 'preprocess':
-    preprocess(sys.argv[2], sys.argv[3], sys.argv[4])
+    preprocess(sys.argv[2], sys.argv[3])
   elif cmd == 'pairwise_reg':
     pairwise_reg(sys.argv[2], sys.argv[3])
   elif cmd == 'linavg_and_check':
