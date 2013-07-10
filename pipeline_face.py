@@ -171,7 +171,7 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
  
   
 
-def nonlinregs():
+def call_ANTS():
   nonlinreg_and_avg('1', 'timage_lsq12','lsq12','linavg.mnc', '100x1x1x1')
   nonlinreg_and_avg('2', 'timages_nonlin', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
   nonlinreg_and_avg('3', 'timages_nonlin', 'nonlin2', 'nonlin2avg.mnc', '100x5')
@@ -179,32 +179,13 @@ def nonlinregs():
   return
 
 
-def final_stats():
-  # STAGE 6: deformations, determinants (wait for all nonlinear registrations) 
-  job_list = []
-  num = 0
-  for subject in listofinputs:
-    inputname = subject[0:-4]
-    complete = len(glob.glob('*/final_stats/*_blur.mnc'))
-    if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
-      num += 1
-      submit_jobs('s6_%s' % inputname, 'nonlin4avg*', './process_face.py deformation %s' % inputname, job_list, 8, "2:00:00", num, count-complete,'fstats')
-  # dependency ???
-  return
-
-
 def tracc_resmp(stage, fwhm, iterations, step, model):
   # CHECK num, num_jobs, complete...
   job_list = []
   if not os.path.exists('avgimages/nonlin%savg.mnc' %stage):
-    if stage == 1:
-      submit_jobs('blurmod%s' %stage, "linavg*",
-                  'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
-                  job_list, 8, "1:00:00", 1,1, "blurmod%s"%stage)
-    else:
-      submit_jobs('blurmod%s' %stage, "nonlin%savg*" %(int(stage)-1), 
-                  'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
-                  job_list, 8, "1:00:00", 1,1, "blurmod%s"%stage)
+    submit_jobs('blurmod%s' %stage, "%s*" %model[0:-4],
+                'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
+                job_list, 8, "1:00:00", 1,1, "blurmod%s"%stage)
     job_list = []
     num = 0
     for subject in listofinputs:
@@ -215,22 +196,62 @@ def tracc_resmp(stage, fwhm, iterations, step, model):
                   './process_face.py tracc %s %s %s %s %s %s' %(inputname, stage, fwhm, iterations, step, model),
                   job_list, 8, "2:00:00", num, count-complete, 'minctracc')
     job_list = []
-    submit_jobs('nonlin%savg' %stage, 'tr%s*' %stage,'./process_face.py mnc_avg timages_nonlin nlin%s nonlin%savg.mnc' %(stage, stage), job_list, 8, "1:00:00", 1,1,'nlavg%s'%stage)    
+    submit_jobs('nonlin%savg' %stage, 'tr%s_*' %stage,'./process_face.py mnc_avg minctracc_out nlin%s nonlin%savg.mnc' %(stage, stage), job_list, 8, "1:00:00", 1,1,'nlavg%s'%stage)    
   return
 
 
 
 def call_tracc():
   for subject in listofinputs:
-    inputname = subject[0:-4]                             
-    mkdirp(inputname + '/minctracc_out')   
+    inputname = subject[0:-4]
+    if not os.path.exists(inputname + '/minctracc_out'):
+      mkdirp(inputname + '/minctracc_out')   
   #tracc_resmp(stage, Gaussian blur, iterations, step size, model name) 
   tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
   tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
   tracc_resmp(3, 8, 30, 4, 'nonlin2avg.mnc') 
   tracc_resmp(4, 4, 30, 4, 'nonlin3avg.mnc')
   tracc_resmp(5, 4, 10, 2, 'nonlin4avg.mnc')
-  tracc_resmp(6, 2, 10, 2, 'nonlin5avg.mnc')  
+  #tracc_resmp(6, 2, 10, 2, 'nonlin5avg.mnc')  
+  return
+
+def final_stats():
+  # STAGE 6: deformations, determinants (wait for all nonlinear registrations) 
+  job_list = []
+  num = 0
+  for subject in listofinputs:
+    inputname = subject[0:-4]
+    complete = len(glob.glob('*/final_stats/*_blur.mnc'))
+    if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
+      num += 1
+      submit_jobs('s6_%s' % inputname, 'nonlin*', './process_face.py deformation %s' % inputname, job_list, 8, "2:00:00", num, count-complete,'fstats')
+  # dependency ???
+  return
+
+def run_all(option):
+  # Run the entire pipeline with the option given. Possible options:
+  # rp = pairwise lsq12 (& mincANTS)
+  # rpt = pairwise lsq12 & minctracc  
+  # rn = non-pairwise lsq12 (& mincANTS)
+  # rnt = non-pairwise lsq12 & minctracc
+  # rt = minctracc
+  
+  preprocessing()
+  if option == 'rp' or option == 'rpt':
+    pairwise()
+  elif option == 'rn' or option == 'rnt':
+    nonpairwise()
+  else:
+    if count <= 20:
+      pairwise()
+    elif count > 20:
+      nonpairwise()
+  linavg()
+  if option == 'rpt' or option == 'rnt' or option == 'rt':
+    call_tracc()
+  else:
+    call_ANTS()
+  final_stats()
   return
 
 
@@ -301,7 +322,6 @@ if __name__ == '__main__':
   inputfile = open('inputlist.xfm', 'w')
   inputfile.write("\n".join(listofinputs))
 
-
   if args.check_inputs:
     sys.exit(1)
     
@@ -327,8 +347,6 @@ if __name__ == '__main__':
   target = random.randint(1,count)
   target = listofinputs[target]
   targetname = target[0:-4]
-  targetname = "H010"
-    
    
     
   if args.p:
@@ -345,41 +363,21 @@ if __name__ == '__main__':
   elif args.a:
     linavg()
   elif args.n:
-    nonlinregs()
+    call_ANTS()
   elif args.f:
     final_stats()
   elif args.rp:         # run pipeline with pairwise & mincANTS
-    preprocessing()
-    pairwise()
-    linavg()
-    nonlinregs()
-    final_stats()
+    run_all('rp')
   elif args.rn:         # run pipeline with nonpairwise & mincANTS
-    preprocessing()
-    nonpairwise()
-    linavg()
-    nonlinregs()
-    final_stats()
+    run_all('rn')
+  elif args.rt:
+    run_all('rt')
   elif args.rpt:        # run pipeline with pairwise & minctracc
-    preprocessing()
-    pairwise()
-    linavg()
-    call_tracc()
-    final_stats()
-  elif args.rpt:        # run pipeline with nonpairwise & minctracc   
-    preprocessing()
-    nonpairwise()
-    linavg()
-    call_tracc()
-    final_stats()  
+    run_all('rpt')
+  elif args.rnt:        # run pipeline with nonpairwise & minctracc   
+    run_all('rnt') 
   elif args.tracc:
     call_tracc()
-  else:                  # execute all stages when no particular stage is specified
-    preprocessing()
-    if count > 20:       # method of lsq12 registrations depends on # of inputs
-      nonpairwise()
-    elif count <= 20:
-      pairwise()
-    linavg()
-    nonlinregs()
-    final_stats()    
+  else:                 # execute all stages when no particular stage is specified
+    run_all('all')
+     

@@ -33,7 +33,7 @@ def preprocess(thefile, image_type, target_type):
       # brain
     if image_type == 'brain':
       execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
-      resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name), 'targetimage.mnc')
+      resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
   elif target_type == 'random':
     if image_type == 'face':
       execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NORM/%s.mnc %s/%s_face.mnc' %(name, name, name, name, name))
@@ -58,11 +58,11 @@ def lsq6reg_and_resample(sourcename, targetname, image_type):  # when target ima
     targetimage = '%s/NORM/%s.mnc' %(targetname, targetname) # use the crop version as targetimage??? mask and crop version has diff dimensions
     like = '%s/NORM/%s_crop.mnc' %(targetname, targetname)
     execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask %s %s/NORM/%s.mnc %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, targetmask, sourcename, sourcename, targetimage, sourcename, sourcename, targetname))
-    resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/NORM/%s.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), like)
+    resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/NORM/%s.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))
   if image_type == 'face':
     targetimage = '%s/%s_face_crop.mnc' %(targetname, targetname)
     execute('bestlinreg -clob -lsq6 %s/%s_face.mnc %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetimage, sourcename, sourcename, targetname))
-    resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/%s_face.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), targetimage)       
+    resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/%s_face.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))       
   return
 
 
@@ -79,28 +79,31 @@ def lsq12reg(sourcename, targetname):
 def xfmavg_inv_resample(targetname):
   execute('xfmavg -clob */lin_tfiles/*_*_lsq12.xfm lsq12avg.xfm')
   execute('xfminvert -clob lsq12avg.xfm lsq12avg_inverse.xfm')
-  resample('lsq12avg_inverse.xfm','%s/output_lsq6/%s_lsq6.mnc' %(targetname, targetname), 'avgsize.mnc','targetimage.mnc')
+  resample('lsq12avg_inverse.xfm','%s/output_lsq6/%s_lsq6.mnc' %(targetname, targetname), 'avgsize.mnc')
   return 
 
 
 
 def lsq12reg_and_resample(sourcename):
   execute('bestlinreg -clob -lsq12 %s/output_lsq6/%s_lsq6.mnc avgsize.mnc %s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename, sourcename, sourcename))
-  resample('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), '%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename), 'targetimage.mnc')
+  resample('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), '%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename))
   return
 
 
-def resample(xfm, inputpath, outputpath, like):
+def resample(xfm, inputpath, outputpath):
   if os.path.exists('targetimage.mnc'):   # better way??
     execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))  
   else:
-    execute('mincresample -clob -transformation %s %s %s -sinc -like %s' %(xfm, inputpath, outputpath, like))
+    if len(glob.glob('H*/NORM/*_crop.mnc')) == 1:
+      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_crop.mnc' %(xfm, inputpath, outputpath))
+    if len(glob.glob('H*/*_face_crop.mnc')) == 1:
+      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/*_face_crop.mnc' %(xfm, inputpath, outputpath))    
   return
 
 
 def xfmavg_and_resample(inputname):
   execute('xfmavg -clob %s/pairwise_tfiles/* %s/pairwise_tfiles/%s.xfm' %(inputname, inputname, inputname))
-  resample('%s/pairwise_tfiles/%s.xfm' %(inputname, inputname), '%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname),'targetimage.mnc')
+  resample('%s/pairwise_tfiles/%s.xfm' %(inputname, inputname), '%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname))
   return
 
 
@@ -148,7 +151,7 @@ def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
       -t SyN[0.5] \
       -o %s/tfiles_nonlin/%s_nonlin%s.xfm \
       -i %s' %(sourcepath, targetimage, inputname, inputname, number, iterations))
-  resample('%s/tfiles_nonlin/%s_nonlin%s.xfm' %(inputname, inputname, number), sourcepath, '%s/timages_nonlin/%s_nonlin%s.mnc' %(inputname,inputname,number), 'targetimage.mnc')   
+  resample('%s/tfiles_nonlin/%s_nonlin%s.xfm' %(inputname, inputname, number), sourcepath, '%s/timages_nonlin/%s_nonlin%s.mnc' %(inputname,inputname,number))   
   return
   
   
@@ -173,11 +176,12 @@ def deformation(inputname):
   return
 
 
+#emacs `which nlfit_smr_modelless` 
+
 def tracc(inputname, num, fwhm, iterations, step, model):
   lttdiam = int(step)*3
-  # change path for lsq12 images!!!!   %s/timage_lsq12/%s_lsq12.mnc
   if not os.path.exists('%s/minctracc_out/%s_lsq12_%s_blur.mnc' %(inputname, inputname,fwhm)):
-    execute('mincblur -clob -fwhm %s ../timages/%s_lsq12.mnc %s/minctracc_out/%s_lsq12_%s' %(fwhm, inputname, inputname, inputname,fwhm))
+    execute('mincblur -clob -fwhm %s %s/timage_lsq12/%s_lsq12.mnc %s/minctracc_out/%s_lsq12_%s' %(fwhm, inputname, inputname, inputname, inputname,fwhm))
   if num == '1':     # no -transformation option for first minctracc
     execute('minctracc -clob -nonlinear corrcoeff \
         -iterations 30 \
@@ -188,7 +192,6 @@ def tracc(inputname, num, fwhm, iterations, step, model):
         -weight 1 \
         -similarity 0.3 \
         %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/linavg_blur.mnc %s/minctracc_out/%s_out1.xfm' %(inputname, inputname, fwhm, inputname, inputname))
-    #execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
   else:
     execute('minctracc -clob -nonlinear corrcoeff \
       -iterations %s \
@@ -200,10 +203,11 @@ def tracc(inputname, num, fwhm, iterations, step, model):
       -similarity 0.3 \
       -transformation %s/minctracc_out/%s_out%s.xfm \
       %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' %(iterations, step,step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
-  execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
+  #execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm %s/timage_lsq12/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, inputname, num))
+  resample('%s/minctracc_out/%s_out%s.xfm' %(inputname,inputname,num), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname), '%s/minctracc_out/%s_nlin%s.mnc' %(inputname,inputname,num))
   return
 
-#emacs `which nlfit_smr_modelless`  
+ 
     
 if __name__ == '__main__':
   cmd = sys.argv[1]
