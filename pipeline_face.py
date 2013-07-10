@@ -17,11 +17,10 @@ def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjo
   elif batch_system == 'pbs':
     job_list.append(command)
     if num == numjobs:       # when all commands are added to the list, submit the list
-      
       outputfile = open('%s' %name_file, 'w')
       outputfile.write("\n".join(job_list))
       outputfile.close()
-      if jobname[0:2] == 's1':
+      if jobname[0:3] == 's1_' or jobname[0:3] == 's1a':
         execute('qbatch -N %s %s %s %s ' %(jobname, name_file, batchsize, time))  # no dependency for first stage
       else:
         execute('qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, name_file, batchsize, time))
@@ -47,12 +46,17 @@ def preprocessing():
         num += 1
         submit_jobs('s1_%s' %inputname, "something", './process_face.py preprocess %s %s %s' %(subject, image_type, target_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess')             # fix dependency
   elif target_type == 'random':
+    num = 0
     for subject in listofinputs:
       inputname = subject[0:-4]    
       complete = len(glob.glob('*/masks/mask.mnc'))
       if not os.path.exists('%s/masks/mask.mnc' %inputname):
-        submit_jobs('s1a_%s' %inputname, "something", './process_face.py preprocess %s %s %s' %(subject, image_type, target_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess_a')
+        num += 1
+        submit_jobs('s1a_%s' %inputname, "something", './process_face.py preprocess %s %s %s' %(subject, image_type, target_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess_a') # fix dependency?
     preprocessing_2()
+  if image_type == 'face':
+    preprocessing_2()
+    
   return 
 
 def preprocessing_2():
@@ -323,6 +327,7 @@ if __name__ == '__main__':
   target = random.randint(1,count)
   target = listofinputs[target]
   targetname = target[0:-4]
+  targetname = "H010"
     
    
     
