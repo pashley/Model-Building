@@ -9,49 +9,85 @@ import re
 import tempfile
 import shutil
 
-def preprocess(thefile, image_type):
-  name = thefile[0:-4]
-  execute('nu_correct -clob inputs/%s %s/NUC/%s' %(thefile, name, thefile))
-  themax = execute('mincstats -max ' + name + '/NUC/' + thefile + ' | cut -c20-31') 	
-  themin = execute('mincstats -min ' + name + '/NUC/' + thefile + ' | cut -c20-31')
-  execute ('minccalc -clob %s/NUC/%s -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s' %(name, thefile, themax, themin, name, thefile))
-  execute("mnc2nii %s/NORM/%s %s/%s.nii" %(name, thefile, name, name))
-  # use sienax to generate mask
-  tmpdir = tempfile.mkdtemp(dir = '%s/' %name)
-  execute("sienax %s/%s.nii -d -o %s" %(name, name, tmpdir)) # -r option ??
+def mask(inputname, inputfolder):
+  execute("mnc2nii %s/%s/%s.mnc %s/%s.nii" %(inputname,inputfolder, inputname, inputname, inputname))
+  tmpdir = tempfile.mkdtemp(dir = '%s/' %inputname)
+  execute("sienax %s/%s.nii -d -o %s" %(inputname, inputname, tmpdir)) # -r option ??
   execute("gzip -d %s/I_stdmaskbrain_seg.nii.gz" %(tmpdir))
   execute("nii2mnc %s/I_stdmaskbrain_seg.nii %s/I_stdmaskbrain_seg.mnc" %(tmpdir, tmpdir))
-  execute('minccalc -clob -expression "A[0] > 0.5" %s/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(tmpdir,name))
+  execute('minccalc -clob -expression "A[0] > 0.5" %s/I_stdmaskbrain_seg.mnc %s/masks/I_stdmaskbrain_seg_discrete.mnc' %(tmpdir,inputname))
   shutil.rmtree(tmpdir)
-  execute('mincresample -clob %s/masks/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask.mnc -like %s/NORM/%s.mnc' %(name,name,name,name))
-  # face
-  if image_type == 'face':
-    execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NORM/%s.mnc %s/%s_face.mnc' %(name, name, name, name, name)) 
-    execute('bestlinreg -clob -lsq6 %s/%s_face.mnc targetfaceimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name,name, name))
-    execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/%s_face.mnc %s/output_lsq6/%s_lsq6.mnc -sinc -like targetfaceimage.mnc' %(name, name, name, name, name, name))
-  # brain
-  else:
-    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name, thefile, name, name))  
-    resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s' %(name, thefile), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
-    # execute ('mincbet %s/NORM/%s %s/masks/%s -m' %(name, thefile, name, name))
-    # mask = name + '_mask.mnc'     
-    # targetmask = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc
-    # targetimage = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc 
-  return
-
-
-def preprocess_stage2(thefile, image_type,targetname):
-  name = thefile[0:-4]
-  if image_type == "face":
-    targetimage = "%s/%s_face.mnc" %(targetname,targetname)
-    execute('bestlinreg -clob -lsq6 %s/%s_face.mnc %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(name, name, targetimage, name, name, targetname)) 
-  else:
-    targetmask = "%s/masks/%s" %(targetname,targetname)
-    targetimage = "%s/NORM/%s" %(targetname, targetname)
-    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask %s %s/NORM/%s %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(name, targetmask, name, thefile, targetimage,name, name, targetname))    
+  execute('mincresample -clob %s/masks/I_stdmaskbrain_seg_discrete.mnc %s/masks/mask.mnc -like %s/%s/%s.mnc' %(inputname, inputname, inputname, inputfolder,inputname))  
   return
   
 
+def preprocess(name, image_type, target_type):
+  ''' 
+  Brain                                            
+  1) intensity inhomogeneity correction
+  2) normalization    
+  3) masking (with sienax)
+  4) linear 6-parameter transformation (if target image provided)
+  5) resample (if target image provided)
+  
+  Craniofacial 
+  1) intensity inhomogeneity correction
+  2) brain extraction
+  3) normalization
+  '''
+  # targetmask.mnc = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI_mask_res.mnc
+  # targetimage.mnc = ~mallar/models/ICBM_nl/icbm_avg_152_t1_tal_nlin_symmetric_VI.mnc 
+  # targetfaceimage.mnc = ?
+  execute('nu_correct -clob inputs/%s.mnc %s/NUC/%s.mnc' %(name, name, name))  # Step 1: intensity inhomogeneity correction
+  if image_type == 'brain':
+    themax = execute('mincstats -max %s/NUC/%s.mnc | cut -c20-31' %(name, name))  	
+    themin = execute('mincstats -min %s/NUC/%s.mnc | cut -c20-31'%(name, name))
+    execute ('minccalc -clob %s/NUC/%s.mnc -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s.mnc' %(name, name, themax, themin, name, name)) # Step 2: normalize before sienax
+    mask(name, 'NORM') # Step 3: masking
+    if target_type == 'given':
+      execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s.mnc targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' 
+              %(name, name, name, name, name))  
+      resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s.mnc' %(name, name), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
+  elif image_type == 'face':  
+    # use sienax to extract the brain
+    mask(name,'NUC')
+    execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NUC/%s.mnc %s/NUC/%s_face.mnc' %(name, name, name, name, name))
+    themax = execute('mincstats -max %s/NUC/%s_face.mnc | cut -c20-31' %(name, name)) 	
+    themin = execute('mincstats -min %s/NUC/%s_face.mnc | cut -c20-31' %(name, name))
+    # normalize after brain extraction
+    execute ('minccalc -clob %s/NUC/%s_face.mnc -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s_face.mnc' %(name, name, themax, themin, name, name)) 
+    #if target_type == 'given':
+      #execute('bestlinreg -clob -lsq6 %s/NORM/%s_face.mnc targetfaceimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name,name, name))
+      #execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/NORM/%s_face.mnc %s/output_lsq6/%s_lsq6.mnc -sinc -like targetfaceimage.mnc' %(name, name, name, name, name, name))        
+  return
+
+
+def autocrop(image_type, targetname): # when target image is a randomly selected input
+  if image_type == 'brain':
+    execute('autocrop -clobber -isoexpand 10 %s/NORM/%s.mnc %s/NORM/%s_crop.mnc' %(targetname,targetname,targetname,targetname))
+    execute('autocrop -clobber -isoexpand 10 %s/masks/mask.mnc %s/masks/mask_crop.mnc' %(targetname, targetname))
+  elif image_type == 'face':
+    execute('autocrop -clobber -isoexpand 10 %s/NORM/%s_face.mnc %s/NORM/%s_face_crop.mnc' %(targetname,targetname,targetname,targetname))
+  return
+  
+  
+def lsq6reg_and_resample(sourcename, targetname, image_type): 
+  """
+  - Continuation of preprocessing stage
+  - executed when target image is a randomly selected normalized input  
+      1) linear 6 parameter transformation
+      2) resample
+  """
+  if image_type == 'brain':
+    targetmask = '%s/masks/mask_crop.mnc' %targetname
+    targetimage = '%s/NORM/%s_crop.mnc' %(targetname, targetname) # use the autocropped version of the randomly selected image as the target image
+    execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask %s %s/NORM/%s.mnc %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, targetmask, sourcename, sourcename, targetimage, sourcename, sourcename, targetname))
+    resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/NORM/%s.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))
+  if image_type == 'face':
+    targetimage = '%s/NORM/%s_face_crop.mnc' %(targetname, targetname)
+    execute('bestlinreg -clob -lsq6 %s/NORM/%s_face.mnc %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetimage, sourcename, sourcename, targetname))
+    resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/NORM/%s_face.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))       
+  return
 
 
 def pairwise_reg(sourcename, targetname):
@@ -72,15 +108,20 @@ def xfmavg_inv_resample(targetname):
 
 
 def lsq12reg_and_resample(sourcename):
-  execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc avgsize.mnc %s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename, sourcename, sourcename))
-  #lsq12reg('%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), 'avgsize.mnc', '%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename))
+  execute('bestlinreg -clob -lsq12 %s/output_lsq6/%s_lsq6.mnc avgsize.mnc %s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename, sourcename, sourcename))
   resample('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), '%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename))
   return
 
 
 def resample(xfm, inputpath, outputpath):
-  execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))
-  return 
+  if os.path.exists('targetimage.mnc'):   # better way??
+    execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))  
+  else:
+    if len(glob.glob('H*/NORM/*_crop.mnc')) == 1:
+      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_crop.mnc' %(xfm, inputpath, outputpath))
+    if len(glob.glob('H*/*_face_crop.mnc')) == 1:
+      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/*_face_crop.mnc' %(xfm, inputpath, outputpath))    
+  return
 
 
 def xfmavg_and_resample(inputname):
@@ -123,6 +164,7 @@ def mnc_avg(inputfolder,inputreg,outputname):
   execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder,inputreg,outputname))
   return
 
+
 def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
   execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
       --number-of-affine-iterations 10000x10000x10000x10000x10000 \
@@ -158,11 +200,12 @@ def deformation(inputname):
   return
 
 
+#emacs `which nlfit_smr_modelless` 
+
 def tracc(inputname, num, fwhm, iterations, step, model):
   lttdiam = int(step)*3
-  # change path for lsq12 images!!!!   %s/timage_lsq12/%s_lsq12.mnc
   if not os.path.exists('%s/minctracc_out/%s_lsq12_%s_blur.mnc' %(inputname, inputname,fwhm)):
-    execute('mincblur -clob -fwhm %s ../timages/%s_lsq12.mnc %s/minctracc_out/%s_lsq12_%s' %(fwhm, inputname, inputname, inputname,fwhm))
+    execute('mincblur -clob -fwhm %s %s/timage_lsq12/%s_lsq12.mnc %s/minctracc_out/%s_lsq12_%s' %(fwhm, inputname, inputname, inputname, inputname,fwhm))
   if num == '1':     # no -transformation option for first minctracc
     execute('minctracc -clob -nonlinear corrcoeff \
         -iterations 30 \
@@ -173,7 +216,6 @@ def tracc(inputname, num, fwhm, iterations, step, model):
         -weight 1 \
         -similarity 0.3 \
         %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/linavg_blur.mnc %s/minctracc_out/%s_out1.xfm' %(inputname, inputname, fwhm, inputname, inputname))
-    #execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
   else:
     execute('minctracc -clob -nonlinear corrcoeff \
       -iterations %s \
@@ -185,24 +227,29 @@ def tracc(inputname, num, fwhm, iterations, step, model):
       -similarity 0.3 \
       -transformation %s/minctracc_out/%s_out%s.xfm \
       %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' %(iterations, step,step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
-  execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm ../timages/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, num))
+  #execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm %s/timage_lsq12/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, inputname, num))
+  resample('%s/minctracc_out/%s_out%s.xfm' %(inputname,inputname,num), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname), '%s/minctracc_out/%s_nlin%s.mnc' %(inputname,inputname,num))
   return
 
-#emacs `which nlfit_smr_modelless`  
+ 
     
 if __name__ == '__main__':
   cmd = sys.argv[1]
   
   if cmd == 'preprocess':
-    preprocess(sys.argv[2], sys.argv[3])
+    preprocess(sys.argv[2], sys.argv[3], sys.argv[4])
+  elif cmd == 'autocrop':
+    autocrop(sys.argv[2], sys.argv[3])
+  elif cmd == 'lsq6reg_and_resample':
+    lsq6reg_and_resample(sys.argv[2], sys.argv[3], sys.argv[4])
   elif cmd == 'pairwise_reg':
     pairwise_reg(sys.argv[2], sys.argv[3])
   elif cmd == 'linavg_and_check':
-    check_lsq12(sys.argv[2], sys.argv[3], sys.argv[4]. sys.argv[5])
+    linavg_and_check(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
   elif cmd == 'lsq12reg':
     lsq12reg(sys.argv[2], sys.argv[3])
   elif cmd == 'xfmavg_inv_resample':
-    xfmavg_inv_resample(sys.argv[2])
+    xfmavg_inv_resample(sys.argv[2]) 
   elif cmd == 'lsq12reg_and_resample':
     lsq12reg_and_resample(sys.argv[2])
   elif cmd == 'resample':

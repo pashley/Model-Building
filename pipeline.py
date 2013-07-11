@@ -17,11 +17,10 @@ def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjo
   elif batch_system == 'pbs':
     job_list.append(command)
     if num == numjobs:       # when all commands are added to the list, submit the list
-      
       outputfile = open('%s' %name_file, 'w')
       outputfile.write("\n".join(job_list))
       outputfile.close()
-      if jobname[0:2] == 's1':
+      if jobname[0:3] == 's1_' or jobname[0:3] == 's1a':
         execute('qbatch -N %s %s %s %s ' %(jobname, name_file, batchsize, time))  # no dependency for first stage
       else:
         execute('qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, name_file, batchsize, time))
@@ -39,22 +38,44 @@ def submit_jobs(jobname, depends, command, job_list, batchsize, time, num, numjo
 def preprocessing():
   job_list = []
   num = 0
-  for subject in listofinputs:
-    inputname = subject[0:-4] 
-    complete = len(glob.glob('*/output_lsq6/*_lsq6.mnc'))
-    if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
-      num += 1
-      submit_jobs('s1_%s' %inputname, "something", './process.py preprocess %s %s' %(subject, image_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess') 
-      # fix dependency
+  if target_type == 'given': 
+    for subject in listofinputs:
+      inputname = subject[0:-4] 
+      complete = len(glob.glob('*/output_lsq6/*_lsq6.mnc'))
+      if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
+        num += 1
+        submit_jobs('s1_%s' %inputname, "something", './process.py preprocess %s %s %s' %(inputname, image_type, target_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess')             # fix dependency
+  elif target_type == 'random':
+    num = 0
+    for subject in listofinputs:
+      inputname = subject[0:-4]    
+      complete = len(glob.glob('*/masks/mask.mnc'))
+      if not os.path.exists('%s/masks/mask.mnc' %inputname):
+        num += 1
+        submit_jobs('s1a_%s' %inputname, "something", './process.py preprocess %s %s %s' %(inputname, image_type, target_type), job_list, 8, "2:00:00", num, count-complete, 'preprocess_a') # fix dependency?
+    preprocessing_2()
+  if image_type == 'face':
+    preprocessing_2()
+    
   return 
+
+def preprocessing_2():
+  job_list =[]
+  submit_jobs('s1b_%s' %targetname, 's1a_*', './process.py autocrop %s %s' %(image_type, targetname), job_list, 8, "1:00:00", 1,1, 'autocrop')
+  
+  job_list = []
+  num = 0
+  for subject in listofinputs:
+    sourcename = subject[0:-4]
+    complete = len(glob.glob('*/output_lsq6/*_lsq6.mnc'))
+    if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename)):
+      num +=1
+      submit_jobs('s1c_%s_%s' %(sourcename,targetname), 's1b_*', './process.py lsq6reg_and_resample %s %s %s' %(sourcename, targetname, image_type),job_list, 8, "2:00:00", num, count-complete, 'preprocess_c')
+  return
+
 
  
 def nonpairwise():         # alternative to pairwise registrations (i.e. too many inputs)          
-  # randomly select an input
-  target = random.randint(1,count)
-  target = listofinputs[target]
-  targetname = target[0:-4]
-
   # STAGE 2A: lsq12 transformation of each input to a randomly selected subject (not pairwise)
   job_list = []
   num = 0
@@ -64,7 +85,7 @@ def nonpairwise():         # alternative to pairwise registrations (i.e. too man
     if sourcename != targetname:
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         num += 1
-        submit_jobs('s2', 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "2:00:00", num, count-complete-1, 'stage2a')
+        submit_jobs('s2_%s' %sourcename, 's1*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "2:00:00", num, count-complete-1, 'stage2a')
         #submit_jobs('sa_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py lsq12reg %s %s' %(sourcename, targetname),job_list, 8, "2:00:00", num, count-complete-1, 'stage2a')
   
   # STAGE 2B: average all lsq12 xfm files, invert this average, resample (apply inverted averaged xfm to randomly selected subject)
@@ -96,7 +117,7 @@ def pairwise():
       complete = len(glob.glob('*/pairwise_tfiles/*_*_lsq12.xfm'))
       if sourcename != targetname and not os.path.exists('%s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         num += 1
-        submit_jobs('s2_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1_*', './process.py pairwise_reg %s %s' %(sourcename, targetname), job_list, 8, "2:00:00", num, ((count-1)*count)-complete, 'plsq12')
+        submit_jobs('s2_%s_%s' %(sourcename[2:4], targetname[2:4]), 's1*', './process.py pairwise_reg %s %s' %(sourcename, targetname), job_list, 8, "2:00:00", num, ((count-1)*count)-complete, 'plsq12')
           
   # STAGE 3: xfm average & resample (wait for all the pairwise registrations)
   job_list = []
@@ -145,13 +166,48 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
  
   
 
-def nonlinregs():
+def call_ANTS():
   nonlinreg_and_avg('1', 'timage_lsq12','lsq12','linavg.mnc', '100x1x1x1')
   nonlinreg_and_avg('2', 'timages_nonlin', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
   nonlinreg_and_avg('3', 'timages_nonlin', 'nonlin2', 'nonlin2avg.mnc', '100x5')
   nonlinreg_and_avg('4', 'timages_nonlin', 'nonlin3', 'nonlin3avg.mnc', '5x20')
   return
 
+
+def tracc_resmp(stage, fwhm, iterations, step, model):
+  # CHECK num, num_jobs, complete...
+  job_list = []
+  if not os.path.exists('avgimages/nonlin%savg.mnc' %stage):
+    submit_jobs('blurmod%s' %stage, "%s*" %model[0:-4],
+                'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
+                job_list, 8, "1:00:00", 1,1, "blurmod%s"%stage)
+    job_list = []
+    num = 0
+    for subject in listofinputs:
+      inputname = subject[0:-4]
+      complete = len(glob.glob('*/minctracc_out/*_nlin%s.mnc' %stage))
+      num += 1
+      submit_jobs('tr%s_%s' %(stage, inputname[2:4]), 'blurmod%s' %stage,
+                  './process.py tracc %s %s %s %s %s %s' %(inputname, stage, fwhm, iterations, step, model),
+                  job_list, 8, "2:00:00", num, count-complete, 'minctracc_%s' %stage)
+    job_list = []
+    submit_jobs('nonlin%savg' %stage, 'tr%s_*' %stage,'./process.py mnc_avg minctracc_out nlin%s nonlin%savg.mnc' %(stage, stage), job_list, 8, "1:00:00", 1,1,'nlavg%s'%stage)    
+  return
+
+
+def call_tracc():
+  for subject in listofinputs:
+    inputname = subject[0:-4]
+    if not os.path.exists(inputname + '/minctracc_out'):
+      mkdirp(inputname + '/minctracc_out')   
+  #tracc_resmp(stage, Gaussian blur, iterations, step size, model name) 
+  tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
+  tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
+  tracc_resmp(3, 8, 30, 4, 'nonlin2avg.mnc') 
+  tracc_resmp(4, 4, 30, 4, 'nonlin3avg.mnc')
+  tracc_resmp(5, 4, 10, 2, 'nonlin4avg.mnc')
+  tracc_resmp(6, 2, 10, 2, 'nonlin5avg.mnc')  
+  return
 
 def final_stats():
   # STAGE 6: deformations, determinants (wait for all nonlinear registrations) 
@@ -162,47 +218,28 @@ def final_stats():
     complete = len(glob.glob('*/final_stats/*_blur.mnc'))
     if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
       num += 1
-      submit_jobs('s6_%s' % inputname, 'nonlin4avg*', './process.py deformation %s' % inputname, job_list, 8, "2:00:00", num, count-complete,'fstats')
+      submit_jobs('s6_%s' % inputname, 'nonlin*', './process.py deformation %s' % inputname, job_list, 8, "2:00:00", num, count-complete,'fstats')
   # dependency ???
   return
 
-
-def tracc_resmp(num, fwhm, iterations, step, model):
-  # CHECK num, num_jobs, complete...
-  job_list = []
-  if not os.path.exists('avgimages/nonlin%savg.mnc' %num):
-    if num == 1:
-      submit_jobs('blurmod%s' %num, "linavg*",
-                  'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
-                  job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)
-    else:
-      submit_jobs('blurmod%s' %num, "nonlin%savg*" %(int(num)-1), 
-                  'mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4]),
-                  job_list, 8, "1:00:00", 1,1, "blurmod%s"%num)
-    job_list = []  
-    for subject in listofinputs:
-      inputname = subject[0:-4]
-      complete = len(glob.glob('*/minctracc_out/*_nlin%s.mnc' %num))
-      submit_jobs('tr%s_%s' %(num, inputname[2:4]), 'blurmod%s' %num,
-                  './process.py tracc %s %s %s %s %s %s' %(inputname, num, fwhm, iterations, step, model),
-                  job_list, 8, "2:00:00", num, count-complete, 'minctracc')
-    job_list = []
-    submit_jobs('nonlin%savg' %num, 'tr%s*' %num,'./process.py mnc_avg timages_nonlin nlin%s nonlin%savg.mnc' %(num, num), job_list, 8, "1:00:00", 1,1,'nlavg%s'%num)    
-  return
-
-
-
-def call_tracc():
-  for subject in listofinputs:
-    inputname = subject[0:-4]                             
-    mkdirp(inputname + '/minctracc_out')   
-  #tracc_resmp(stage, Gaussian blur, iterations, step size, model name) 
-  tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
-  tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
-  tracc_resmp(3, 8, 30, 4, 'nonlin2avg.mnc') 
-  tracc_resmp(4, 4, 30, 4, 'nonlin3avg.mnc')
-  tracc_resmp(5, 4, 10, 2, 'nonlin4avg.mnc')
-  tracc_resmp(6, 2, 10, 2, 'nonlin5avg.mnc')  
+def run_all(option):
+  # Run the entire pipeline with the option given
+  preprocessing()
+  if option == 'rp' or option == 'rpt':
+    pairwise()
+  elif option == 'rn' or option == 'rnt':
+    nonpairwise()
+  else:
+    if count <= 20:
+      pairwise()
+    elif count > 20:
+      nonpairwise()
+  linavg()
+  if option == 'rpt' or option == 'rnt' or option == 'rt':
+    call_tracc()
+  else:
+    call_ANTS()
+  final_stats()
   return
 
 
@@ -245,8 +282,8 @@ if __name__ == '__main__':
                       help="final stats: deformation fields, determinant")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
                       help="batch system to process jobs")
-  #parser.add_argument("-random_target", action="store_true",
-                      #help="radomly select one input to be target image for linear registrations")
+  parser.add_argument("-random_target", action="store_true",
+                      help="randomly select one input to be target image")
   
   # fix option above !!! ^^^   
 
@@ -256,11 +293,11 @@ if __name__ == '__main__':
     image_type = 'face'
   else:
     image_type = 'brain'
-  #image_type = args.image
-  #if args.random_target():
-    #target_type = 'random'
-  #else:
-    #target_type = 'given'  
+  
+  if args.random_target:
+    target_type = 'random'
+  else:
+    target_type = 'given'  
   
   prefix = args.prefix
 
@@ -295,8 +332,10 @@ if __name__ == '__main__':
       mkdirp(name + '/final_stats')
     
     
-
-    
+  target = random.randint(1,count)
+  target = listofinputs[target]
+  targetname = target[0:-4]
+  targetname = "H010"  # remove this!
    
     
   if args.p:
@@ -313,41 +352,21 @@ if __name__ == '__main__':
   elif args.a:
     linavg()
   elif args.n:
-    nonlinregs()
+    call_ANTS()
   elif args.f:
     final_stats()
   elif args.rp:         # run pipeline with pairwise & mincANTS
-    preprocessing()
-    pairwise()
-    linavg()
-    nonlinregs()
-    final_stats()
+    run_all('rp')
   elif args.rn:         # run pipeline with nonpairwise & mincANTS
-    preprocessing()
-    nonpairwise()
-    linavg()
-    nonlinregs()
-    final_stats()
+    run_all('rn')
+  elif args.rt:
+    run_all('rt')
   elif args.rpt:        # run pipeline with pairwise & minctracc
-    preprocessing()
-    pairwise()
-    linavg()
-    call_tracc()
-    final_stats()
-  elif args.rpt:        # run pipeline with nonpairwise & minctracc   
-    preprocessing()
-    nonpairwise()
-    linavg()
-    call_tracc()
-    final_stats()  
+    run_all('rpt')
+  elif args.rnt:        # run pipeline with nonpairwise & minctracc   
+    run_all('rnt') 
   elif args.tracc:
     call_tracc()
-  else:                  # execute all stages when no particular stage is specified
-    preprocessing()
-    if count > 20:       # method of lsq12 registrations depends on # of inputs
-      nonpairwise()
-    elif count <= 20:
-      pairwise()
-    linavg()
-    nonlinregs()
-    final_stats()    
+  else:                 # execute all stages when no particular stage is specified
+    run_all('all')
+     
