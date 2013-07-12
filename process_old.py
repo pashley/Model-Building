@@ -132,18 +132,33 @@ def xfmavg_and_resample(inputname):
   return
 
 
-def check_lsq12():
-  try:
+def check_lsq12(string):
+  listofinputs = string.split()
+  for subject in listofinputs:
+    inputname = subject[0:-4]
+    #for subject2 in glob.glob('inputs/*'):
+      #targetname = subject2[7:11]
+      #if targetname != inputname:
+        #try:
+          #execute('minccomplete %s/pairwise_tfiles/%s_%s_lsq12.xfm' %(inputname, inputname, targetname)) # check all pairwise transformation files (necessary?)
+        #except subprocess.CalledProcessError:
+          #execute("qdel reg*, nonlin*,s*")
+          #sys.exit(1)
+    try: 
+      execute('minccomplete %s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname)) # check for lsq12.mnc for every input
+    except subprocess.CalledProcessError:
+      execute("qdel reg*, nonlin*, s6*")
+  try: 
     execute('minccomplete avgimages/linavg.mnc')   # check for average 
   except subprocess.CalledProcessError:
-    execute("qdel reg*, nonlin*, s6*, tr*, blur*")
+    execute("qdel reg*, nonlin*, s6*")
     #print e.output
   return  
 
 
 def linavg_and_check(inputfolder, inputreg, outputname, string):
   execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder, inputreg, outputname))
-  check_lsq12()
+  check_lsq12(string)
   return
 
 
