@@ -19,17 +19,17 @@ def submit_jobs(jobname, depends, job_list, batchsize, time, name_file):
       if len(job_list) != 1:                          # just to get nicer job names
         command_split = command.split()
         jobname2 = jobname + "_" + command_split[2]
-      print jobname2  + " " + command
-      #execute('sge_batch -J %s -H "%s" %s' %(jobname2, depends, command))
+      #print jobname2  + " " + command
+      execute('sge_batch -J %s -H "%s" %s' %(jobname2, depends, command))
   
   elif batch_system == 'pbs':
     outputfile = open('%s' %name_file, 'w')
     outputfile.write("\n".join(job_list))
     outputfile.close()
     if jobname[0:3] == 's1_' or jobname[0:3] == 's1a':
-      execute('qbatch -N %s %s %s %s ' %(jobname, name_file, batchsize, time))  # no dependency for first stage
+      execute('./MAGeTbrain/bin/qbatch -N %s %s %s %s ' %(jobname, name_file, batchsize, time))  # no dependency for first stage
     else:
-      execute('qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, name_file, batchsize, time))
+      execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, name_file, batchsize, time))
       #cmdfileinfo = tempfile.mkstemp(dir='./')
       #cmdfile = open(cmdfileinfo[1], 'w')
       #cmdfile.write("\n".join(job_list))
@@ -44,7 +44,7 @@ def submit_jobs(jobname, depends, job_list, batchsize, time, name_file):
 
 def preprocessing():
   job_list = []
-  if target_type == 'given': 
+  if target_type == 'given' and not image_type == 'face': 
     for inputname in listofinputs: 
       if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
         job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
@@ -220,7 +220,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument("-face", action="store_true",
                       help="craniofacial structure (default brain)")
-  parser.add_argument("-prefix", action="append",
+  parser.add_argument("-prefix", action="append",    # possible to specify more than one prefix
                       help= "selects subsets of inputs within the inputs directory")
   parser.add_argument("-check_inputs", action="store_true",
                       help="generate list of inputs to be processed")
@@ -308,11 +308,9 @@ if __name__ == '__main__':
     mkdirp('avgimages') 
     
     
-  target = random.randint(1,count)
-  target = listofinputs[target]
-  targetname = target[0:-4]
-  targetname = "H016"
-   
+  target = random.randint(0,count-1) 
+  targetname = listofinputs[target]
+  print "targetname == %s" %targetname
     
   if args.p:
     preprocessing()

@@ -43,7 +43,7 @@ def preprocess(name, image_type, target_type):
   if image_type == 'brain':
     themax = execute('mincstats -max %s/NUC/%s.mnc | cut -c20-31' %(name, name))  	
     themin = execute('mincstats -min %s/NUC/%s.mnc | cut -c20-31'%(name, name))
-    execute ('minccalc -clob %s/NUC/%s.mnc -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s.mnc' %(name, name, themax, themin, name, name)) 
+    execute('minccalc -clob %s/NUC/%s.mnc -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s.mnc' %(name, name, themax, themin, name, name)) 
     mask(name, 'NORM') 
     if target_type == 'given':
       execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask targetmask.mnc %s/NORM/%s.mnc targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' 
@@ -51,11 +51,16 @@ def preprocess(name, image_type, target_type):
       resample('%s/lin_tfiles/%s_lsq6.xfm' %(name, name), '%s/NORM/%s.mnc' %(name, name), '%s/output_lsq6/%s_lsq6.mnc' %(name, name))
   
   elif image_type == 'face':  
-    mask(name,'NUC')
-    execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NUC/%s.mnc %s/NUC/%s_face.mnc' %(name, name, name, name, name))
+    mask(name,'NUC') #minccalc -expression "(1-A[1])*A[0]" H001/NUC/H001.mnc H001/masks/mask.mnc
+    vartype = execute('mincinfo -vartype image %s/NUC/%s.mnc' %(name,name))
+    # CHECK THIS PART!!
+    if vartype == 'short\n':
+      execute('minccalc -clob -expression "(1-A[1])*A[0]" %s/NUC/%s.mnc %s/masks/mask.mnc %s/NUC/%s_face.mnc' %(name, name, name, name, name))
+    elif vartype == 'long\n':
+      execute('minccalc -clob -expression "(1-A[0])*A[1]" %s/masks/mask.mnc %s/NUC/%s.mnc %s/NUC/%s_face.mnc' %(name, name, name, name, name))
     themax = execute('mincstats -max %s/NUC/%s_face.mnc | cut -c20-31' %(name, name)) 	
     themin = execute('mincstats -min %s/NUC/%s_face.mnc | cut -c20-31' %(name, name))
-    execute ('minccalc -clob %s/NUC/%s_face.mnc -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s_face.mnc' %(name, name, themax, themin, name, name)) 
+    execute('minccalc -clob %s/NUC/%s_face.mnc -expression "10000*(A[0]-0)/(%s-%s)" %s/NORM/%s_face.mnc' %(name, name, themax, themin, name, name)) 
     #if target_type == 'given':
       #execute('bestlinreg -clob -lsq6 %s/NORM/%s_face.mnc targetfaceimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(name, name,name, name))
       #execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/NORM/%s_face.mnc %s/output_lsq6/%s_lsq6.mnc -sinc -like targetfaceimage.mnc' %(name, name, name, name, name, name))        
@@ -86,7 +91,7 @@ def lsq6reg_and_resample(sourcename, targetname, image_type):
   
   elif image_type == 'face':
     targetimage = '%s/NORM/%s_face_crop.mnc' %(targetname, targetname)
-    #execute('bestlinreg -clob -lsq6 %s/NORM/%s_face.mnc %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetimage, sourcename, sourcename, targetname))
+    execute('bestlinreg -clob -lsq6 %s/NORM/%s_face.mnc %s %s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetimage, sourcename, sourcename, targetname))
     resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/NORM/%s_face.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))       
   return
 
@@ -121,8 +126,8 @@ def resample(xfm, inputpath, outputpath):
   else:
     if len(glob.glob('H*/NORM/*_crop.mnc')) == 1:
       execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_crop.mnc' %(xfm, inputpath, outputpath))
-    if len(glob.glob('H*/NORM/*_face_crop.mnc')) == 1:
-      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_face_crop.mnc' %(xfm, inputpath, outputpath))    
+    #if len(glob.glob('H*/NORM/*_face_crop.mnc')) == 1:
+      #execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_face_crop.mnc' %(xfm, inputpath, outputpath))    
   return
 
 
@@ -141,7 +146,7 @@ def check_lsq12():
   return  
 
 
-def linavg_and_check(inputfolder, inputreg, outputname, string):
+def linavg_and_check(inputfolder, inputreg, outputname):
   execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder, inputreg, outputname))
   check_lsq12()
   return
@@ -232,7 +237,7 @@ if __name__ == '__main__':
   elif cmd == 'pairwise_reg':
     pairwise_reg(sys.argv[2], sys.argv[3])
   elif cmd == 'linavg_and_check':
-    linavg_and_check(sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])
+    linavg_and_check(sys.argv[2], sys.argv[3], sys.argv[4])
   elif cmd == 'lsq12reg':
     lsq12reg(sys.argv[2], sys.argv[3])
   elif cmd == 'xfmavg_inv_resample':
