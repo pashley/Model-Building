@@ -97,17 +97,21 @@ def lsq6reg_and_resample(sourcename, targetname, image_type):
 
 
 def pairwise_reg(sourcename, targetname):
-  """ Pairwise registrations """
+  """ Pairwise 12-parameter registrations """
   execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc %s/output_lsq6/%s_lsq6.mnc %s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
   return
 
 
 def lsq12reg(sourcename, targetname):
+  """ 12-parameter registration of each input to a randomly selected subject (alternative to pairwise lsq12) """
   execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc %s/output_lsq6/%s_lsq6.mnc %s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
   return
 
    
 def xfmavg_inv_resample(targetname):
+  """ 1)average all lsq12 xfm files
+      2)invert this average
+      3)resample (apply inverted averaged xfm to randomly selected subject)"""
   execute('xfmavg -clob */lin_tfiles/*_*_lsq12.xfm lsq12avg.xfm')
   execute('xfminvert -clob lsq12avg.xfm lsq12avg_inverse.xfm')
   resample('lsq12avg_inverse.xfm','%s/output_lsq6/%s_lsq6.mnc' %(targetname, targetname), 'avgsize.mnc')
@@ -115,12 +119,15 @@ def xfmavg_inv_resample(targetname):
 
 
 def lsq12reg_and_resample(sourcename):
+  """ 1)lsq12 tranformation for every original input to the "average size"
+      2)resample """
   execute('bestlinreg -clob -lsq12 %s/output_lsq6/%s_lsq6.mnc avgsize.mnc %s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename, sourcename, sourcename))
   resample('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), '%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename))
   return
 
 
 def resample(xfm, inputpath, outputpath):
+  """ mincresample """
   if os.path.exists('targetimage.mnc'):   # better way??
     execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))  
   else:
@@ -132,12 +139,15 @@ def resample(xfm, inputpath, outputpath):
 
 
 def xfmavg_and_resample(inputname):
+  """1)average all pairwise lsq12 xfm files for each input
+     2)resample (apply averaged xfm file to the respective input) """
   execute('xfmavg -clob %s/pairwise_tfiles/* %s/pairwise_tfiles/%s.xfm' %(inputname, inputname, inputname))
   resample('%s/pairwise_tfiles/%s.xfm' %(inputname, inputname), '%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname))
   return
 
 
 def check_lsq12():
+  """ Check for completion of 12-parameter transformation stage"""
   try:
     execute('minccomplete avgimages/linavg.mnc')   # check for average 
   except subprocess.CalledProcessError:
@@ -147,17 +157,22 @@ def check_lsq12():
 
 
 def linavg_and_check(inputfolder, inputreg, outputname):
-  execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder, inputreg, outputname))
+  """1) average all linearly processed images
+     2) check for completion of 12-parameter transformation stage"""
+  mnc_avg(inputfolder, inputreg, outputname)
   check_lsq12()
   return
 
 
 def mnc_avg(inputfolder,inputreg,outputname):
+  """ mincaverage """
   execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder,inputreg,outputname))
   return
 
 
 def nonlin_reg(inputname, sourcepath, targetimage, number, iterations):
+  """1)mincANTS
+     2)resample """
   execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
       --number-of-affine-iterations 10000x10000x10000x10000x10000 \
       --MI-option 32x16000 \
@@ -218,7 +233,7 @@ def tracc(inputname, num, fwhm, iterations, step, model):
       -weight 1 \
       -similarity 0.3 \
       -transformation %s/minctracc_out/%s_out%s.xfm \
-      %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' %(iterations, step,step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
+      %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' %(iterations, step, step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
   #execute('mincresample -clob -transformation %s/minctracc_out/%s_out%s.xfm %s/timage_lsq12/%s_lsq12.mnc %s/minctracc_out/%s_nlin%s.mnc -like targetimage.mnc' %(inputname, inputname, num, inputname, inputname, inputname, inputname, num))
   resample('%s/minctracc_out/%s_out%s.xfm' %(inputname,inputname,num), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname), '%s/minctracc_out/%s_nlin%s.mnc' %(inputname,inputname,num))
   return

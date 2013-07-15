@@ -10,8 +10,6 @@ import random
 import tempfile
 
 
-
-
 def submit_jobs(jobname, depends, job_list, batchsize, time, name_file): 
   if batch_system == 'sge':
     for command in job_list:
@@ -26,10 +24,7 @@ def submit_jobs(jobname, depends, job_list, batchsize, time, name_file):
     outputfile = open('%s' %name_file, 'w')
     outputfile.write("\n".join(job_list))
     outputfile.close()
-    if jobname[0:3] == 's1_' or jobname[0:3] == 's1a':
-      execute('./MAGeTbrain/bin/qbatch -N %s %s %s %s ' %(jobname, name_file, batchsize, time))  # no dependency for first stage
-    else:
-      execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, name_file, batchsize, time))
+    execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, name_file, batchsize, time))
       #cmdfileinfo = tempfile.mkstemp(dir='./')
       #cmdfile = open(cmdfileinfo[1], 'w')
       #cmdfile.write("\n".join(job_list))
@@ -44,18 +39,28 @@ def submit_jobs(jobname, depends, job_list, batchsize, time, name_file):
 
 def preprocessing():
   job_list = []
-  if target_type == 'given' and not image_type == 'face': 
-    for inputname in listofinputs: 
-      if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
-        job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-    submit_jobs('s1' , "something", job_list, 8, "2:00:00", 'preprocess')             # fix dependency
-  
-  elif target_type == 'random' or image_type == 'face':
-    for inputname in listofinputs:    
-      if not os.path.exists('%s/masks/mask.mnc' %inputname):
-        job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-    submit_jobs('s1a', "something", job_list, 8, "2:00:00", 'preprocess_a') # fix dependency?
+  for inputname in listofinputs:
+    if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
+      job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
+  submit_jobs('s1a', "something", job_list, 8, "2:00:00", 'preprocess_a') # fix dependency?
+  if target_type == 'random' or image_type == 'face':
     preprocessing_2()
+  
+
+  
+  #job_list = []
+  #if target_type == 'given' and not image_type == 'face': 
+    #for inputname in listofinputs: 
+      #if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
+        #job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
+    #submit_jobs('s1' , "something", job_list, 8, "2:00:00", 'preprocess')             # fix dependency
+  
+  #elif target_type == 'random' or image_type == 'face':
+    #for inputname in listofinputs:    
+      #if not os.path.exists('%s/masks/mask.mnc' %inputname):
+        #job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
+    #submit_jobs('s1a', "something", job_list, 8, "2:00:00", 'preprocess_a') # fix dependency?
+    #preprocessing_2()
     
      #what about given target image and face?
   return 
@@ -133,7 +138,11 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
   for inputname in listofinputs:
     if not os.path.exists('%s/timages_nonlin/%s_nonlin%s.mnc' %(inputname,inputname, number)):
       job_list.append('./process.py nonlin_reg %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations))
-  submit_jobs('reg%s' %number, '%s*' %targetimage[0:-4], job_list, 8, "2:00:00", 'nlreg%s'%number)
+  if targetimage == 'linavg.mnc' and batch_system == 'pbs':  # WHY?
+    print "linear average"
+    submit_jobs('reg%s' %number, 'linavg_*', job_list, 8, "2:00:00", 'nlreg%s'%number)
+  else:
+    submit_jobs('reg%s' %number, '%s*' %targetimage[0:-4], job_list, 8, "2:00:00", 'nlreg%s'%number)
   
  
   # wait for all H*_nonlin#.mnc files
@@ -144,7 +153,7 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
  
   
 def call_ANTS():
-  nonlinreg_and_avg('1', 'timage_lsq12','lsq12','linavg.mnc', '100x1x1x1')
+  nonlinreg_and_avg('1', 'timage_lsq12', 'lsq12', 'linavg.mnc', '100x1x1x1')
   nonlinreg_and_avg('2', 'timages_nonlin', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
   nonlinreg_and_avg('3', 'timages_nonlin', 'nonlin2', 'nonlin2avg.mnc', '100x5')
   nonlinreg_and_avg('4', 'timages_nonlin', 'nonlin3', 'nonlin3avg.mnc', '5x20')
@@ -160,7 +169,7 @@ def tracc_resmp(stage, fwhm, iterations, step, model):
     job_list = []
     for inputname in listofinputs:
       job_list.append('./process.py tracc %s %s %s %s %s %s' %(inputname, stage, fwhm, iterations, step, model))
-    submit_jobs('tr%s' %stage, 'blurmod%s' %stage, job_list, 8, "2:00:00", 'minctracc_%s' %stage)
+    submit_jobs('tr%s' %stage, 'blurmod%s*' %stage, job_list, 8, "2:00:00", 'minctracc_%s' %stage)
     
     job_list = ['./process.py mnc_avg minctracc_out nlin%s nonlin%savg.mnc' %(stage, stage)]
     submit_jobs('nonlin%savg' %stage, 'tr%s_*' %stage, job_list, 8, "1:00:00", 'nlavg%s'%stage)    
@@ -248,6 +257,7 @@ if __name__ == '__main__':
                       help="minctracc nonlinear transformations (6 iterations with preset parameters)")
   parser.add_argument("-n", action="store_true", 
                       help="4 nonlinear registrations: (mincANTS, resample, average)x4")
+  
   parser.add_argument("-f", action="store_true",
                       help="final stats: deformation fields, determinant")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
