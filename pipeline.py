@@ -9,64 +9,73 @@ import sys
 import random
 import tempfile
 
-""" Write a nice summary here! 
+""" 
+ROUGHT DRAFT:
+
+
+-The following scripts must be in the directory in which pipeline.py is being executed:
+    - process.py
+    - utils.py
+    - utils.pyc  ??
+    - xfmjoin 
+    - MAGetbrain ?? 
+    - targetimage.mnc (if target image is provided)
+    - targetmask.mnc (if target image is provided)
+    
+To run 
+
 """
 
-def submit_jobs(jobname, depends, job_list, batchsize, time, name_file):
+
+def submit_jobs(jobname, depends, job_list):
   """ Submits jobs to the user specified batch system"""
-  if batch_system == 'sge':
-    for command in job_list:
-      jobname2 = jobname
-      if len(job_list) != 1:                      # just to get nicer job names
-        command_split = command.split()
-        jobname2 = jobname + "_" + command_split[2]
-      #print jobname2  + " " + command
-      execute('sge_batch -J %s -H "%s" %s' %(jobname2, depends, command))
-  
-  elif batch_system == 'pbs':
-    outputfile = open('%s' %name_file, 'w')
-    outputfile.write("\n".join(job_list))
-    outputfile.close()
-    execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, name_file, batchsize, time))
-      #cmdfileinfo = tempfile.mkstemp(dir='./')
-      #cmdfile = open(cmdfileinfo[1], 'w')
-      #cmdfile.write("\n".join(job_list))
-      #cmdfile.close()
-      #execute('qbatch --afterok_pattern %s %s %s %s ' %(depends, basename(cmdfileinfo[1]), batchsize, time))
+  # proceed to submitting job(s) when there is at least one job in the list 
+  if len(job_list) >= 1:     
+    if batch_system == 'sge':
+      for command in job_list:
+        jobname2 = jobname
+        if len(job_list) != 1:                      # just to get nicer job names
+          command_split = command.split()
+          jobname2 = jobname + "_" + command_split[2]
+        print jobname2  + " " + command    
+        #execute('sge_batch -J %s -H "%s" %s' %(thejobname, depends, command))
+    
+    elif batch_system == 'pbs':
+      # create a temporary file with the list of jobs to submit to qbatch
+      cmdfileinfo = tempfile.mkstemp(dir='./') 
+      cmdfile = open(cmdfileinfo[1], 'w')
+      cmdfile.write("\n".join(job_list))
+      cmdfile.close()
+      if depends[-2] != '_':            # sometimes dependency names without the underscore aren't recognized
+        depends = depends[0:-1] + "_*"  # add the underscore to the dependency names 
+      batchsize = 8
+      if len(job_list) == 1:
+        time = "1:00:00"
+      else:
+        time = "2:00:00"
+      execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends,  basename(cmdfileinfo[1]), batchsize, time))
       #os.remove(cmdfile.name)
-  
-  elif batch_system == 'loc':  # run locally
-    for command in job_list:
-      execute(command)
+    
+    elif batch_system == 'loc':  # run locally
+      for command in job_list:
+        execute(command)
   return
+
+
+
+
 
 
 def preprocessing():
   """Calls the preprocess stage for every input and submits the jobs"""
  
-  #job_list = []
-  #for inputname in listofinputs:
-    #if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
-      #job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-  #submit_jobs('s1a', "something", job_list, 8, "2:00:00", 'preprocess_a') # fix dependency?
-  #if target_type == 'random' or image_type == 'face':
-    #preprocessing_2()
-  
   job_list = []
-  if target_type == 'given' and not image_type == 'face': 
-    for inputname in listofinputs: 
-      if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
-        job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-    submit_jobs('s1' , "something", job_list, 8, "2:00:00", 'preprocess')             # fix dependency
-  
-  elif target_type == 'random' or image_type == 'face':
-    for inputname in listofinputs:    
-      if not os.path.exists('%s/masks/mask.mnc' %inputname):
-        job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-    submit_jobs('s1a', "something", job_list, 8, "2:00:00", 'preprocess_a') # fix dependency?
+  for inputname in listofinputs:
+    if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
+      job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
+  submit_jobs('s1a', "something", job_list, 8, "2:00:00", 'preprocess_a') # fix dependency?
+  if target_type == 'random' or image_type == 'face':
     preprocessing_2()
-    
-     #what about given target image and face?
   return 
 
 
@@ -77,14 +86,14 @@ def preprocessing_2():
   """
   # Stage 1
   job_list =['./process.py autocrop %s %s' %(image_type, targetname)]
-  submit_jobs('s1b_%s' %targetname, 's1a_*', job_list, 8, "1:00:00", 'autocrop')
+  submit_jobs('s1_b', 's1_a_*', job_list)
   
   # Stage 2
   job_list = []
   for sourcename in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename)):
       job_list.append('./process.py lsq6reg_and_resample %s %s %s' %(sourcename, targetname, image_type))
-  submit_jobs('s1c', 's1b_*', job_list, 8, "2:00:00", 'preprocess_c')
+  submit_jobs('s1_c', 's1_b_*', job_list)
   return
 
  
@@ -100,19 +109,19 @@ def nonpairwise():
     if sourcename != targetname:
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         job_list.append('./process.py lsq12reg %s %s' %(sourcename, targetname))
-  submit_jobs('s2', 's1*', job_list, 8, "2:00:00",'stage2a')
+  submit_jobs('s2', 's1*', job_list)
         
  # Stage 2 
   job_list = ['./process.py xfmavg_inv_resample %s' %targetname]
   if not os.path.exists('avgsize.mnc'):
-    submit_jobs('avgsize','s2_*', job_list, 8, "2:00:00", 'avgsize') 
+    submit_jobs('avgsize','s2_*', job_list) 
    
   # Stage 3 
   job_list = []
   for sourcename in listofinputs:    
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename)):
       job_list.append('./process.py lsq12reg_and_resample %s' %sourcename)
-  submit_jobs('s3', 'avgsize*', job_list, 8, "2:00:00", 'stage3')
+  submit_jobs('s3', 'avgsize*', job_list)
   return  
     
  
@@ -127,14 +136,14 @@ def pairwise():
     for targetname in listofinputs:
       if sourcename != targetname and not os.path.exists('%s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         job_list.append('./process.py pairwise_reg %s %s' %(sourcename, targetname))      
-  submit_jobs('s2', 's1*', job_list, 8, "2:00:00", 'plsq12')
+  submit_jobs('s2', 's1*', job_list)
           
   # Stage 2
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(inputname,inputname)):
       job_list.append('./process.py xfmavg_and_resample %s' %inputname)
-  submit_jobs('s3', 's2_*', job_list, 8, "2:00:00", 'p_res')
+  submit_jobs('s3', 's2_*', job_list)
   return
 
 
@@ -142,7 +151,7 @@ def linavg():
   """Average linearly processed images & check for completion of the lsq12 stage """
   job_list = ['./process.py linavg_and_check timage_lsq12 lsq12 linavg.mnc']
   if not os.path.exists('avgimages/linavg.mnc'):
-    submit_jobs('linavg', 's3_*', job_list, 8, "1:00:00", 'linavg')
+    submit_jobs('linavg', 's3_*', job_list)
   return
 
 
@@ -157,26 +166,16 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
   for inputname in listofinputs:
     if not os.path.exists('%s/timages_nonlin/%s_nonlin%s.mnc' %(inputname,inputname, number)):
       job_list.append('./process.py nonlin_reg %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations))
-  if targetimage == 'linavg.mnc' and batch_system == 'pbs':  # because scinet doesn't like the dependency name "linavg*" :( WHY??
-    print "linear average"
-    submit_jobs('reg%s' %number, 'linavg_*', job_list, 8, "2:00:00", 'nlreg%s'%number)
-  else:
-    submit_jobs('reg%s' %number, '%s*' %targetimage[0:-4], job_list, 8, "2:00:00", 'nlreg%s'%number)
-  
+  submit_jobs('reg%s' %number, '%s*' %targetimage[0:-4], job_list)
  # Stage 2
   job_list = ['./process.py mnc_avg timages_nonlin nonlin%s nonlin%savg.mnc' %(number, number)]
   if not os.path.exists('avgimages/nonlin%savg.mnc' % number):
-    submit_jobs('nonlin%savg' %number, 'reg%s_*' %number, job_list, 8, "2:00:00", 'nlavg%s'%number)
+    submit_jobs('nonlin%savg' %number, 'reg%s_*' %number, job_list)
   return
  
   
 def call_ANTS(iteration):
   """Calls each iteration of mincANTS with the appropriate parameters"""
-  #if iteration == 'all':
-    #nonlinreg_and_avg('1', 'timage_lsq12', 'lsq12', 'linavg.mnc', '100x1x1x1')
-    #nonlinreg_and_avg('2', 'timages_nonlin', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
-    #nonlinreg_and_avg('3', 'timages_nonlin', 'nonlin2', 'nonlin2avg.mnc', '100x5')
-    #nonlinreg_and_avg('4', 'timages_nonlin', 'nonlin3', 'nonlin3avg.mnc', '5x20')
   if iteration == '1' or iteration == 'all':
     nonlinreg_and_avg('1', 'timage_lsq12', 'lsq12', 'linavg.mnc', '100x1x1x1')
   if iteration == '2' or iteration == 'all':
@@ -199,17 +198,18 @@ def tracc_resmp(stage, fwhm, iterations, step, model):
   # Stage 1
   job_list = ['mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4])]
   if not os.path.exists('avgimages/nonlin%savg.mnc' %stage):
-    submit_jobs('blurmod%s' %stage, "%s*" %model[0:-4], job_list, 8, "1:00:00", "blurmod%s"%stage)
+    submit_jobs('blurmod%s' %stage, "%s*" %model[0:-4], job_list)
+    
     
     # Stage 2
     job_list = []
     for inputname in listofinputs:
       job_list.append('./process.py tracc %s %s %s %s %s %s' %(inputname, stage, fwhm, iterations, step, model))
-    submit_jobs('tr%s' %stage, 'blurmod%s*' %stage, job_list, 8, "2:00:00", 'minctracc_%s' %stage)
+    submit_jobs('tr%s' %stage, 'blurmod%s*' %stage, job_list)
     
     # Stage 3
     job_list = ['./process.py mnc_avg minctracc_out nlin%s nonlin%savg.mnc' %(stage, stage)]
-    submit_jobs('nonlin%savg' %stage, 'tr%s_*' %stage, job_list, 8, "1:00:00", 'nlavg%s'%stage)    
+    submit_jobs('nonlin%savg' %stage, 'tr%s_*' %stage, job_list)    
   return
 
 
@@ -233,7 +233,10 @@ def final_stats():
   for inputname in listofinputs:
     if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
       job_list.append( './process.py deformation %s' %inputname)
-  submit_jobs('s6', 'nonlin*', job_list, 8, "2:00:00", 'fstats')
+  if batch_system == 'pbs':           #TODO: fix depends name
+    submit_jobs('s6', 'nonlin*_*', job_list)
+  else:
+    submit_jobs('s6', 'nonlin*', job_list)
   # dependency ???
   return
 
@@ -250,9 +253,9 @@ def run_all(option):
   elif option == 'rn' or option == 'rnt':
     nonpairwise()
   else:               # when no option is specified the method of lsq12 registrations is dependent on the number of inputs
-    if count <= 20:
+    if count <= 300:
       pairwise()
-    elif count > 20:
+    elif count > 300:
       nonpairwise()
   linavg()
   if option == 'rpt' or option == 'rnt' or option == 'rt':
@@ -364,9 +367,9 @@ if __name__ == '__main__':
   if args.p:
     preprocessing()
   elif args.lsq12:
-    if count > 20:
+    if count > 300:
       nonpairwise()
-    elif count <= 20:
+    elif count <= 300:
       pairwise()    
   elif args.lsq12p:
     pairwise()
