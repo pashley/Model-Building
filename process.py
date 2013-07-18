@@ -10,6 +10,7 @@ import tempfile
 import shutil
 
 def mask(inputname, inputfolder):
+  """Generates brain mask using sienax"""
   execute("mnc2nii %s/%s/%s.mnc %s/%s.nii" %(inputname,inputfolder, inputname, inputname, inputname))
   tmpdir = tempfile.mkdtemp(dir = '%s/' %inputname)
   execute("sienax %s/%s.nii -d -o %s" %(inputname, inputname, tmpdir)) # -r option ??
@@ -22,15 +23,18 @@ def mask(inputname, inputfolder):
   
 
 def preprocess(name, image_type, target_type):
-  """ Preprocessing stage    
-   Brain                                            
+  """Preprocessing stage    
+   Brain
+   PART 1
    1) intensity inhomogeneity correction
    2) normalization     
    3) masking (with sienax)
-   4) linear 6-parameter transformation (if target image provided)
-   5) resample (if target image provided)
    
-   Craniofacial
+   PART 2 (if target image is provided)
+   4) linear 6-parameter registration 
+   5) resample
+   
+   Craniofacial structure processing 
    1) intensity inhomogeneity correction
    2) brain extraction
    3) normalization 
@@ -71,50 +75,61 @@ def preprocess(name, image_type, target_type):
 
 
 def autocrop(image_type, targetname): # when target image is a randomly selected input
-  """  """
+  """Expands the bounds of the target image MINC file by 10% for all axes """
   if image_type == 'brain':
     execute('autocrop -clobber -isoexpand 10 %s/NORM/%s.mnc %s/NORM/%s_crop.mnc' %(targetname,targetname,targetname,targetname))
     execute('autocrop -clobber -isoexpand 10 %s/masks/mask.mnc %s/masks/mask_crop.mnc' %(targetname, targetname))
   elif image_type == 'face':
     execute('autocrop -clobber -isoexpand 10 %s/NORM/%s_face.mnc %s/NORM/%s_face_crop.mnc' %(targetname,targetname,targetname,targetname))
   return
+
   
   
-def lsq6reg_and_resample(sourcename, targetname, image_type):   
+  
+def preprocess2(sourcename, targetname, image_type):   
   """ Preprocessing Stage - Continued
-  Executed when the target image is a randomly selected normalized input.
+  Executed when the target image is a randomly selected (normalized) input.
   
-  1) Expand the bounds of the target image MINC file by 10% for all axes
   1) Linear 6-parameter transformation (using the expanded version of the randomly selected image as the target image) 
   2) Resample
   """
   if image_type == 'brain':
-    if not os.path.exists('%s/NORM/%s_crop.mnc' %(targetname, targetname)):
-      execute('autocrop -clobber -isoexpand 10 %s/NORM/%s.mnc %s/NORM/%s_crop.mnc' %(targetname,targetname,targetname,targetname))
-      execute('autocrop -clobber -isoexpand 10 %s/masks/mask.mnc %s/masks/mask_crop.mnc' %(targetname, targetname))    
+    #if not os.path.exists('%s/NORM/%s_crop.mnc' %(targetname, targetname)):
+      #execute('autocrop -clobber -isoexpand 10 %s/NORM/%s.mnc %s/NORM/%s_crop.mnc' %(targetname,targetname,targetname,targetname))
+      #execute('autocrop -clobber -isoexpand 10 %s/masks/mask.mnc %s/masks/mask_crop.mnc' %(targetname, targetname))    
     execute('bestlinreg -clob -lsq6 -source_mask %s/masks/mask.mnc -target_mask %s/masks/mask_crop.mnc %s/NORM/%s.mnc %s/NORM/%s_crop.mnc %s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, targetname, sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
     resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/NORM/%s.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))
     
   elif image_type == 'face':
-    if not os.path.exists('%s/NORM/%s_face_crop.mnc' %(targetname, targetname)):
-      execute('autocrop -clobber -isoexpand 10 %s/NORM/%s_face.mnc %s/NORM/%s_face_crop.mnc' %(targetname,targetname,targetname,targetname))    
+    #if not os.path.exists('%s/NORM/%s_face_crop.mnc' %(targetname, targetname)):
+      #execute('autocrop -clobber -isoexpand 10 %s/NORM/%s_face.mnc %s/NORM/%s_face_crop.mnc' %(targetname,targetname,targetname,targetname))    
     execute('bestlinreg -clob -lsq6 %s/NORM/%s_face.mnc %s/NORM/%s_face_crop.mnc %s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
     resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), '%s/NORM/%s_face.mnc' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))       
   return
 
 
 def pairwise_reg(sourcename, targetname):
-  """Pairwise 12-parameter transformation registrations"""
+  """Pairwise 12-parameter registrations: PART 1"""
   execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc %s/output_lsq6/%s_lsq6.mnc %s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
   return
 
+def xfmavg_and_resample(inputname):
+  """Pairwise 12-parameter registrations: PART 2"""
+  execute('xfmavg -clob %s/pairwise_tfiles/* %s/pairwise_tfiles/%s.xfm' %(inputname, inputname, inputname))
+  resample('%s/pairwise_tfiles/%s.xfm' %(inputname, inputname), '%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname))
+  return
 
+ 
 def lsq12reg(sourcename, targetname):
+  ''' Non-pairwise 12-parameter registrations: PART 1
+  12-parameter transformation of each input to a randomly selected subject '''
   execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc %s/output_lsq6/%s_lsq6.mnc %s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
   return
 
    
 def xfmavg_inv_resample(targetname):
+  """ Non-pairwise 12-parameter registrations: PART 2
+  Average all lsq12 xfm files, invert this average & resample (apply inverted averaged xfm to the randomly selected subject)"""
   execute('xfmavg -clob */lin_tfiles/*_*_lsq12.xfm lsq12avg.xfm')
   execute('xfminvert -clob lsq12avg.xfm lsq12avg_inverse.xfm')
   resample('lsq12avg_inverse.xfm','%s/output_lsq6/%s_lsq6.mnc' %(targetname, targetname), 'avgsize.mnc')
@@ -122,12 +137,15 @@ def xfmavg_inv_resample(targetname):
 
 
 def lsq12reg_and_resample(sourcename):
+  """Non-pairwise 12-parameter registrations: PART 3
+  Repeat 12-parameter transformation of each input to this 'average size' & resample"""
   execute('bestlinreg -clob -lsq12 %s/output_lsq6/%s_lsq6.mnc avgsize.mnc %s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename, sourcename, sourcename))
   resample('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename), '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename), '%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename))
   return
 
 
 def resample(xfm, inputpath, outputpath):
+  """Mincresample a minc file with the previously generated transformation file"""
   if os.path.exists('targetimage.mnc'):   # better way??
     execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))  
   else:
@@ -138,13 +156,8 @@ def resample(xfm, inputpath, outputpath):
   return
 
 
-def xfmavg_and_resample(inputname):
-  execute('xfmavg -clob %s/pairwise_tfiles/* %s/pairwise_tfiles/%s.xfm' %(inputname, inputname, inputname))
-  resample('%s/pairwise_tfiles/%s.xfm' %(inputname, inputname), '%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname))
-  return
-
-
 def check_lsq12():
+  """Checks for the successful completion of the 12-parameter registration stage"""
   try:
     execute('minccomplete avgimages/linavg.mnc')   # check for average 
   except subprocess.CalledProcessError:
@@ -154,12 +167,18 @@ def check_lsq12():
 
 
 def linavg_and_check(inputfolder, inputreg, outputname):
+  """Averages the linearly processed images """
   mnc_avg(inputfolder, inputreg, outputname)
-  check_lsq12()
+  try:
+    execute('minccomplete avgimages/linavg.mnc')   # check for average 
+  except subprocess.CalledProcessError:
+    execute("qdel reg*, nonlin*, s6*, tr*, blur*")
+  #check_lsq12()
   return
 
 
 def mnc_avg(inputfolder,inputreg,outputname):
+  """Averages processed images"""
   execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder,inputreg,outputname))
   return
 
@@ -198,6 +217,18 @@ def deformation(inputname):
   execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' %(inputname, inputname, inputname, inputname))  
   return
 
+def longitudinal(time1, time2):
+  # if mincANTS
+  execute('mincANTS 3 -m PR[%s/timages_nonlin/%s_nonlin4.mnc,avgimages/%s,1,4] \
+      --number-of-affine-iterations 10000x10000x10000x10000x10000 \
+      --MI-option 32x16000 \
+      --affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
+      --use-Histogram-Matching \
+      -r Gauss[3,0] \
+      -t SyN[0.5] \
+      -o %s/longitudinal/%s_.xfm \
+      -i %s' %(inputname, inputname, targetimage, inputname, inputname, number, iterations))
+  return
 
 #emacs `which nlfit_smr_modelless` 
 
@@ -239,8 +270,8 @@ if __name__ == '__main__':
     preprocess(sys.argv[2], sys.argv[3], sys.argv[4])
   elif cmd == 'autocrop':
     autocrop(sys.argv[2], sys.argv[3])
-  elif cmd == 'lsq6reg_and_resample':
-    lsq6reg_and_resample(sys.argv[2], sys.argv[3], sys.argv[4])
+  elif cmd == 'preprocess2':
+    preprocess2(sys.argv[2], sys.argv[3], sys.argv[4])
   elif cmd == 'pairwise_reg':
     pairwise_reg(sys.argv[2], sys.argv[3])
   elif cmd == 'linavg_and_check':

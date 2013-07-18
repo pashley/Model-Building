@@ -10,9 +10,9 @@ import random
 import tempfile
 
 """ 
-ROUGHT DRAFT:
+ROUGHT DRAFT of this description:
 
-
+- processes MINC files.
 -The following scripts must be in the directory in which pipeline.py is being executed:
     - process.py
     - utils.py
@@ -28,7 +28,7 @@ To run
 
 
 def submit_jobs(jobname, depends, job_list):
-  """ Submits jobs to the user specified batch system"""
+  """ Submits jobs to the batch system specified by the user """
   # proceed to submitting job(s) when there is at least one job in the list 
   if len(job_list) >= 1:     
     if batch_system == 'sge':
@@ -37,8 +37,8 @@ def submit_jobs(jobname, depends, job_list):
         if len(job_list) != 1:                      # just to get nicer job names
           command_split = command.split()
           jobname2 = jobname + "_" + command_split[2]
-        print jobname2  + " " + command    
-        #execute('sge_batch -J %s -H "%s" %s' %(thejobname, depends, command))
+        #print jobname2  + " " + command    
+        execute('sge_batch -J %s -H "%s" %s' %(jobname2, depends, command))
     
     elif batch_system == 'pbs':
       # create a temporary file with the list of jobs to submit to qbatch
@@ -47,21 +47,19 @@ def submit_jobs(jobname, depends, job_list):
       cmdfile.write("\n".join(job_list))
       cmdfile.close()
       if depends[-2] != '_':            # sometimes dependency names without the underscore aren't recognized
-        depends = depends[0:-1] + "_*"  # add the underscore to the dependency names 
+        depends = depends[0:-1] + "_*"  # add the underscore to the dependency names that don't have one  
       batchsize = 8
       if len(job_list) == 1:
         time = "1:00:00"
       else:
         time = "2:00:00"
       execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends,  basename(cmdfileinfo[1]), batchsize, time))
-      #os.remove(cmdfile.name)
+      os.remove(cmdfile.name)
     
-    elif batch_system == 'loc':  # run locally
+    elif batch_system == 'local':  # run locally
       for command in job_list:
         execute(command)
   return
-
-
 
 
 
@@ -73,27 +71,24 @@ def preprocessing():
   for inputname in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-  submit_jobs('s1a', "something", job_list, 8, "2:00:00", 'preprocess_a') # fix dependency?
+  submit_jobs('s1_a', "something", job_list) # fix dependency?
   if target_type == 'random' or image_type == 'face':
     preprocessing_2()
   return 
 
 
 def preprocessing_2():
-  """Continuation of preprocessing stage (executed when target image is a randomly selected normalized input)
-  Stage 1: Isoexpand the randomly selected target image
-  Stage 2: Linear 6-parameter transformation & resample
-  """
-  # Stage 1
-  job_list =['./process.py autocrop %s %s' %(image_type, targetname)]
+  """ Calls the Part 2 of the preprocessing stage 
+  Executed for craniofacial structure image processing or when the target image is a randomly selected subject"""
+  job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
   submit_jobs('s1_b', 's1_a_*', job_list)
   
-  # Stage 2
   job_list = []
   for sourcename in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename)):
-      job_list.append('./process.py lsq6reg_and_resample %s %s %s' %(sourcename, targetname, image_type))
-  submit_jobs('s1_c', 's1_b_*', job_list)
+      job_list.append('./process.py preprocess2 %s %s %s' %(sourcename, targetname, image_type))
+  #submit_jobs('s1_b', 's1_a_*', job_list)
+  submit_jobs('s1_c', 's1_b*', job_list)
   return
 
  
@@ -191,7 +186,7 @@ def tracc_resmp(stage, fwhm, iterations, step, model):
   """Nonlinear processing
   Stage 1: Perform Gaussian blurring on the model image
   Stage 2: a) Perform Gaussian blurring on the lsq12-processed input image
-           b) Fork the blurred input image, blurred model image and the 'previous' transfomation file (except for the first iteration) into minctracc
+           b) Fork the blurred input image, blurred model image and the 'previous' transformation file (except for the first iteration) into minctracc
            c) Resample the lsq12-processed input image
   Stage 3: Average the processed images """
   
@@ -269,11 +264,11 @@ def run_all(option):
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument("-face", action="store_true",
-                      help="craniofacial structure (default brain)")
+                      help="craniofacial structure imaging (default brain imaging)")
   parser.add_argument("-prefix", action="append",    # possible to specify more than one prefix
-                      help= "selects subsets of inputs within the inputs directory")
+                      help= "specify subset(s) of inputs within the inputs directory to process")
   parser.add_argument("-check_inputs", action="store_true",
-                      help="generate list of inputs to be processed")
+                      help="generate a file with the list of inputs to be processed")
   parser.add_argument("-rp", action="store_true",
                     help="run pipeline with pairwise lsq12 registrations")
   parser.add_argument("-rn", action= "store_true",
@@ -292,17 +287,17 @@ if __name__ == '__main__':
                        help="pairwise lsq12 registrations")
   parser.add_argument("-lsq12n", action="store_true",
                       help="non-pairwise lsq12 registrations")
-  parser.add_argument("-a",action="store_true", 
+  parser.add_argument("-linavg",action="store_true", 
                       help="average linearly processed images")
   parser.add_argument("-tracc",action="store_true",
                       help="minctracc nonlinear transformations (6 iterations with preset parameters)")
-  parser.add_argument("-n", action="store_true", 
+  parser.add_argument("-ants", action="store_true", 
                       help="4 nonlinear registrations: (mincANTS, resample, average)x4")
   parser.add_argument("-ants_stage", choices=['1','2','3','4'], 
                       help="run a single interation of mincANTS")
   parser.add_argument("-f", action="store_true",
                       help="final stats: deformation fields, determinant")
-  parser.add_argument("batch_system", choices=['sge', 'pbs', 'loc'],
+  parser.add_argument("batch_system", choices=['sge', 'pbs', 'local'],
                       help="batch system to process jobs")
   parser.add_argument("-random_target", action="store_true",
                       help="randomly select one input to be target image")
@@ -362,7 +357,7 @@ if __name__ == '__main__':
     
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
-  print "targetname == %s" %targetname
+  
     
   if args.p:
     preprocessing()
@@ -375,9 +370,9 @@ if __name__ == '__main__':
     pairwise()
   elif args.lsq12n:
     nonpairwise()
-  elif args.a:
+  elif args.linavg:
     linavg()
-  elif args.n:
+  elif args.ants:
     call_ANTS('all')
   elif args.ants_stage: 
     call_ANTS(args.ants_stage)
