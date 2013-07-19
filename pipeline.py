@@ -9,10 +9,12 @@ import sys
 import random
 import tempfile
 
-""" 
+"""   
+
 ROUGHT DRAFT of this description:
 
-- processes MINC files.
+
+processes MINC files.
 -The following scripts must be in the directory in which pipeline.py is being executed:
     - process.py
     - utils.py
@@ -22,23 +24,28 @@ ROUGHT DRAFT of this description:
     - targetimage.mnc (if target image is provided)
     - targetmask.mnc (if target image is provided)
     
+    
+    
 To run 
 
 """
 
 
 def submit_jobs(jobname, depends, job_list):
-  """ Submits jobs to the batch system specified by the user """
-  # proceed to submitting job(s) when there is at least one job in the list 
+  """ Submits a list of jobs to the batch system specified by the user """
+  # proceed to submitting if there is at least one job in the list 
   if len(job_list) >= 1:     
+    
     if batch_system == 'sge':
       for command in job_list:
-        jobname2 = jobname
-        if len(job_list) != 1:                      # just to get nicer job names
+        # Add the input's name to the name of input-specific jobs 
+        if len(job_list) != 1:                      
           command_split = command.split()
-          jobname2 = jobname + "_" + command_split[2]
-        #print jobname2  + " " + command    
-        execute('sge_batch -J %s -H "%s" %s' %(jobname2, depends, command))
+          thejobname = jobname + "_" + command_split[2] # the input's name is the 2nd argument in the command 
+        else:
+          thejobname = jobname
+        #print thejobname  + " " + command    
+        execute('sge_batch -J %s -H "%s" %s' %(thejobname, depends, command))
     
     elif batch_system == 'pbs':
       # create a temporary file with the list of jobs to submit to qbatch
@@ -46,13 +53,15 @@ def submit_jobs(jobname, depends, job_list):
       cmdfile = open(cmdfileinfo[1], 'w')
       cmdfile.write("\n".join(job_list))
       cmdfile.close()
-      if depends[-2] != '_':            # sometimes dependency names without the underscore aren't recognized
-        depends = depends[0:-1] + "_*"  # add the underscore to the dependency names that don't have one  
+       
+      if depends[-2] != '_':            # sometimes dependency names without the underscore aren't recognized on scinet
+        depends = depends[0:-1] + "_*"  # so, add the underscore to dependency names that don't have one 
+        print depends
       batchsize = 8
       if len(job_list) == 1:
-        time = "1:00:00"
+        time = "1:00:00"  # default walltime for 1 batch of 1 tasks
       else:
-        time = "2:00:00"
+        time = "2:00:00"  # default walltime for 1 batch of 8 tasks
       execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends,  basename(cmdfileinfo[1]), batchsize, time))
       os.remove(cmdfile.name)
     
@@ -64,20 +73,20 @@ def submit_jobs(jobname, depends, job_list):
 
 
 
-def preprocessing():
+def call_preprocess():
   """Calls the preprocess stage for every input and submits the jobs"""
  
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-  submit_jobs('s1_a', "something", job_list) # fix dependency?
+  submit_jobs('s1_a', "something_*", job_list) # fix dependency?
   if target_type == 'random' or image_type == 'face':
-    preprocessing_2()
+    call_preprocess2()
   return 
 
 
-def preprocessing_2():
+def call_preprocess2():
   """ Calls the Part 2 of the preprocessing stage 
   Executed for craniofacial structure image processing or when the target image is a randomly selected subject"""
   job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
@@ -93,25 +102,22 @@ def preprocessing_2():
 
  
 def nonpairwise():
-  """ Alternative to pairwise lsq12 registrations (i.e. when there are too many inputs)
-  Stage 1: 12-parameter transformation of each input to a randomly selected subject (not pairwise)
-  Stage 2: Average all lsq12 xfm files, invert this average & resample (apply inverted averaged xfm to the randomly selected subject)
-  Stage 3: Repeat 12-parameter transformation of each input to this 'average size' & resample
-  """
-  # Stage 1 
+  """ Sets up the non-pairwise 12-parameter registration stage.
+  This is the alternative to pairwise 2-parameter registrations (when there are too many inputs,for instance)"""
+  # PART 1: calls lsq12reg 
   job_list = []
   for sourcename in listofinputs:     
-    if sourcename != targetname:
+    if sourcename != targetname: 
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         job_list.append('./process.py lsq12reg %s %s' %(sourcename, targetname))
   submit_jobs('s2', 's1*', job_list)
         
- # Stage 2 
+  # PART 2: calls xfmavg_inv_resample
   job_list = ['./process.py xfmavg_inv_resample %s' %targetname]
   if not os.path.exists('avgsize.mnc'):
     submit_jobs('avgsize','s2_*', job_list) 
    
-  # Stage 3 
+  # PART 3: calls lsq12reg_and_resample
   job_list = []
   for sourcename in listofinputs:    
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(sourcename, sourcename)):
@@ -121,11 +127,8 @@ def nonpairwise():
     
  
 def pairwise():
-  """ Pairwise lsq12 registrations
-  Stage 1: 12-parameter transformation of each subject to all other subjects
-  Stage 2: Average all pairwise xfm files for each subject & resample each subject using their averaged xfm file
-  """
-  # Stage 1
+  """ Sets up the pairwise 12-parameter registration stage"""
+  # PART 1: calls pairwise_reg
   job_list = []
   for sourcename in listofinputs:
     for targetname in listofinputs:
@@ -133,7 +136,7 @@ def pairwise():
         job_list.append('./process.py pairwise_reg %s %s' %(sourcename, targetname))      
   submit_jobs('s2', 's1*', job_list)
           
-  # Stage 2
+  # PART 2: calls xfmavg_and_resample
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/timage_lsq12/%s_lsq12.mnc' %(inputname,inputname)):
@@ -142,27 +145,24 @@ def pairwise():
   return
 
 
-def linavg():
+def call_linavg():
   """Average linearly processed images & check for completion of the lsq12 stage """
   job_list = ['./process.py linavg_and_check timage_lsq12 lsq12 linavg.mnc']
   if not os.path.exists('avgimages/linavg.mnc'):
     submit_jobs('linavg', 's3_*', job_list)
   return
 
-
   
-def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations):
-  """ Nonlinear processing
-  Stage 1: Execute mincANTS for every subject using the 'previous' average as the model image & resample 
-  Stage 2: Average the nonlinearly processed images
-  """
-  # Stage 1 
+def ANTS_and_avg(number, sourcefolder,inputregname, targetimage, iterations):
+  """ Sets up the nonlinear processing stage which uses mincANTS"""
+  # PART 1: calls nonlin_reg 
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/timages_nonlin/%s_nonlin%s.mnc' %(inputname,inputname, number)):
       job_list.append('./process.py nonlin_reg %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations))
   submit_jobs('reg%s' %number, '%s*' %targetimage[0:-4], job_list)
- # Stage 2
+ 
+ # PART 2: calls mnc_avg
   job_list = ['./process.py mnc_avg timages_nonlin nonlin%s nonlin%savg.mnc' %(number, number)]
   if not os.path.exists('avgimages/nonlin%savg.mnc' % number):
     submit_jobs('nonlin%savg' %number, 'reg%s_*' %number, job_list)
@@ -172,37 +172,30 @@ def nonlinreg_and_avg(number, sourcefolder,inputregname, targetimage, iterations
 def call_ANTS(iteration):
   """Calls each iteration of mincANTS with the appropriate parameters"""
   if iteration == '1' or iteration == 'all':
-    nonlinreg_and_avg('1', 'timage_lsq12', 'lsq12', 'linavg.mnc', '100x1x1x1')
+    ANTS_and_avg('1', 'timage_lsq12', 'lsq12', 'linavg.mnc', '100x1x1x1')
   if iteration == '2' or iteration == 'all':
-    nonlinreg_and_avg('2', 'timages_nonlin', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
+    ANTS_and_avg('2', 'timages_nonlin', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
   if iteration == '3' or iteration == 'all':
-    nonlinreg_and_avg('3', 'timages_nonlin', 'nonlin2', 'nonlin2avg.mnc', '100x5')
+    ANTS_and_avg('3', 'timages_nonlin', 'nonlin2', 'nonlin2avg.mnc', '100x5')
   if iteration == '4' or iteration == 'all':
-    nonlinreg_and_avg('4', 'timages_nonlin', 'nonlin3', 'nonlin3avg.mnc', '5x20')
+    ANTS_and_avg('4', 'timages_nonlin', 'nonlin3', 'nonlin3avg.mnc', '5x20')
   return
 
 
 def tracc_resmp(stage, fwhm, iterations, step, model):
-  """Nonlinear processing
-  Stage 1: Perform Gaussian blurring on the model image
-  Stage 2: a) Perform Gaussian blurring on the lsq12-processed input image
-           b) Fork the blurred input image, blurred model image and the 'previous' transformation file (except for the first iteration) into minctracc
-           c) Resample the lsq12-processed input image
-  Stage 3: Average the processed images """
-  
-  # Stage 1
+  """Sets up the nonlinear processing stage which uses minctracc"""
+  # PART 1
   job_list = ['mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4])]
   if not os.path.exists('avgimages/nonlin%savg.mnc' %stage):
     submit_jobs('blurmod%s' %stage, "%s*" %model[0:-4], job_list)
     
-    
-    # Stage 2
+    # PART 2
     job_list = []
     for inputname in listofinputs:
       job_list.append('./process.py tracc %s %s %s %s %s %s' %(inputname, stage, fwhm, iterations, step, model))
     submit_jobs('tr%s' %stage, 'blurmod%s*' %stage, job_list)
     
-    # Stage 3
+    # PART 3
     job_list = ['./process.py mnc_avg minctracc_out nlin%s nonlin%savg.mnc' %(stage, stage)]
     submit_jobs('nonlin%savg' %stage, 'tr%s_*' %stage, job_list)    
   return
@@ -222,8 +215,9 @@ def call_tracc():
   tracc_resmp(6, 2, 10, 2, 'nonlin5avg.mnc')  
   return
 
-def final_stats():
-  """Deformation fields""" 
+
+def call_final_stats():
+  """Calls the deformation fields stage""" 
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
@@ -235,14 +229,16 @@ def final_stats():
   # dependency ???
   return
 
+
 def run_all(option):
   '''Run the entire pipeline with the option selected.
   rp = pairwise lsq12 
   rpt = pairwise lsq12 & minctracc
   rn = non-pairwise lsq12 (& mincANTS)
   rnt = non-pairwise lsq12 & minctracc
+  rcl = landmarked-based facial feature analysis (default: mincANTS)
   '''
-  preprocessing()
+  call_preprocess()
   if option == 'rp' or option == 'rpt':
     pairwise()
   elif option == 'rn' or option == 'rnt':
@@ -252,12 +248,51 @@ def run_all(option):
       pairwise()
     elif count > 300:
       nonpairwise()
-  linavg()
+  call_linavg()
   if option == 'rpt' or option == 'rnt' or option == 'rt':
     call_tracc()
   else:
     call_ANTS('all')  # default nonlinear 
-  final_stats()
+  call_final_stats()
+  
+  if option == 'rcl':
+    landmark()
+  return
+
+
+def call_longitudinal():
+  # run entire pipeline on time-1
+  run_all('all')
+  
+  # nu_correct time-2
+  job_list = []
+  for inputname in listofinputs:
+    if not os.path.exists('%s/time2/%s_nuc.mnc' %(inputname, inputname)):
+      job_list.append('./longitudinal.py preprocess_time2 %s' %inputname)
+  submit_jobs('nuc_t2','s6_*',job_list) #TODO: fix dependency name
+  
+  
+  job_list = []
+  for inputname in listofinputs:
+    if not os.path.exists('%s/det3_blur.mnc'):
+      job_list.append('./longitudinal.py longitudinal %s' %inputname)
+  submit_jobs('lng', 'nuc_t2*', job_list)
+  return
+
+
+
+
+
+def landmark():
+  job_list = ['./landmark_facial.py warp_landmarked_2_model']
+  if not os.path.exists('landmarked_nonlin_model.mnc'):
+    submit_jobs('lnmk_model','s6_*', job_list)
+    
+  job_list = []
+  for inputname in listofinputs:
+    if not os.path.exists('%s/landmarked/%s_landmarked.mnc' %(inputname, inputname)):
+      job_list.append('./landmark_facial.py warp_model_2_subject %s' %inputname)
+  submit_jobs('lndmk', 's6_*', job_list)    
   return
 
 
@@ -279,6 +314,8 @@ if __name__ == '__main__':
                       help="run pipeline with pairwise lsq12 registrations and minctracc")
   parser.add_argument("-rnt", action="store_true", 
                       help="run pipeline with non-pairwise lsq12 registrations and minctracc")
+  parser.add_argument("-rcl", action="store_true", 
+                      help="run pipeline with craniofacial structure imaging & landmark-based facial feature analysis")
   parser.add_argument("-p", action="store_true", 
                       help="preprocessing: correct, normalize, mask, lsq6, resample")
   parser.add_argument("-lsq12",action="store_true",
@@ -299,8 +336,12 @@ if __name__ == '__main__':
                       help="final stats: deformation fields, determinant")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'local'],
                       help="batch system to process jobs")
+  parser.add_argument("-l", action="store_true",
+                      help="testing longitudinal")
   parser.add_argument("-random_target", action="store_true",
                       help="randomly select one input to be target image")
+  parser.add_argument("-landmark",action="store_true",
+                      help="landmark-based facial feature analysis")
   
   args = parser.parse_args()
   batch_system = args.batch_system
@@ -334,7 +375,14 @@ if __name__ == '__main__':
 
   if args.check_inputs:
     sys.exit(1)
-    
+  
+  if args.l:
+    string 
+    for subject in listofinputs:
+      execute("./longitudinal.py nlreg %s" %subject)
+    sys.exit(1)
+  
+  
   count = len(listofinputs)  # number of inputs to process
 
   for subject in listofinputs:
@@ -344,8 +392,8 @@ if __name__ == '__main__':
       mkdirp(subject + '/NORM')
       mkdirp(subject + '/masks')              
       mkdirp(subject + '/lin_tfiles')          
-      mkdirp(subject + '/output_lsq6')        
-      mkdirp(subject + '/pairwise_tfiles')      
+      mkdirp(subject + '/output_lsq6')
+      mkdirp(subject + '/pairwise_tfiles')    # don't need when nonpw  
       mkdirp(subject + '/timage_lsq12')                        
       mkdirp(subject + '/tfiles_nonlin')      # don't need when minctracc
       mkdirp(subject + '/timages_nonlin')     # don't need when minctracc
@@ -360,7 +408,7 @@ if __name__ == '__main__':
   
     
   if args.p:
-    preprocessing()
+    call_preprocess()
   elif args.lsq12:
     if count > 300:
       nonpairwise()
@@ -371,13 +419,15 @@ if __name__ == '__main__':
   elif args.lsq12n:
     nonpairwise()
   elif args.linavg:
-    linavg()
+    call_linavg()
   elif args.ants:
     call_ANTS('all')
   elif args.ants_stage: 
     call_ANTS(args.ants_stage)
   elif args.f:
-    final_stats()
+    call_final_stats()
+  elif args.landmark:
+    landmark()
   elif args.rp:       # run pipeline with pairwise & mincANTS
     run_all('rp')
   elif args.rn:       # run pipeline with nonpairwise & mincANTS
@@ -387,9 +437,15 @@ if __name__ == '__main__':
   elif args.rpt:      # run pipeline with pairwise & minctracc
     run_all('rpt')
   elif args.rnt:      # run pipeline with nonpairwise & minctracc   
-    run_all('rnt') 
+    run_all('rnt')
+  elif args.rcl:
+    image_type = 'face'
+    run_all('rcl')
   elif args.tracc:
     call_tracc()
+  elif args.l:
+    call_longitudinal()
+      
   else:               # execute all stages when no particular stage is specified
     run_all('all')
      

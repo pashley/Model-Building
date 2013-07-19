@@ -9,6 +9,11 @@ import re
 import tempfile
 import shutil
 
+
+""" Rough draft of description:
+- Functions are organized according to the necessary dependencies between stages of the pipeline
+"""
+
 def mask(inputname, inputfolder):
   """Generates brain mask using sienax"""
   execute("mnc2nii %s/%s/%s.mnc %s/%s.nii" %(inputname,inputfolder, inputname, inputname, inputname))
@@ -119,7 +124,7 @@ def xfmavg_and_resample(inputname):
   resample('%s/pairwise_tfiles/%s.xfm' %(inputname, inputname), '%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname), '%s/timage_lsq12/%s_lsq12.mnc' %(inputname, inputname))
   return
 
- 
+
 def lsq12reg(sourcename, targetname):
   ''' Non-pairwise 12-parameter registrations: PART 1
   12-parameter transformation of each input to a randomly selected subject '''
@@ -217,23 +222,16 @@ def deformation(inputname):
   execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' %(inputname, inputname, inputname, inputname))  
   return
 
-def longitudinal(time1, time2):
-  # if mincANTS
-  execute('mincANTS 3 -m PR[%s/timages_nonlin/%s_nonlin4.mnc,avgimages/%s,1,4] \
-      --number-of-affine-iterations 10000x10000x10000x10000x10000 \
-      --MI-option 32x16000 \
-      --affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
-      --use-Histogram-Matching \
-      -r Gauss[3,0] \
-      -t SyN[0.5] \
-      -o %s/longitudinal/%s_.xfm \
-      -i %s' %(inputname, inputname, targetimage, inputname, inputname, number, iterations))
-  return
 
 #emacs `which nlfit_smr_modelless` 
-
+"""Nonlinear processing
+  Stage 1: Perform Gaussian blurring on the model image
+  Stage 2: a) Perform Gaussian blurring on the lsq12-processed input image
+           b) Fork the blurred input image, blurred model image and the 'previous' transformation file (except for the first iteration) into minctracc
+           c) Resample the lsq12-processed input image
+  Stage 3: Average the processed images """
 def tracc(inputname, num, fwhm, iterations, step, model):
-  lttdiam = int(step)*3
+  lttdiam = int(step)*3  # lattice diameter is 3 x step size
   if not os.path.exists('%s/minctracc_out/%s_lsq12_%s_blur.mnc' %(inputname, inputname,fwhm)):
     execute('mincblur -clob -fwhm %s %s/timage_lsq12/%s_lsq12.mnc %s/minctracc_out/%s_lsq12_%s' %(fwhm, inputname, inputname, inputname, inputname,fwhm))
   if num == '1':     # no -transformation option for first minctracc
