@@ -11,7 +11,7 @@ import tempfile
 
 """   
 
-ROUGHT DRAFT of this description:
+ROUGH DRAFT of this description:
 
 
 processes MINC files.
@@ -20,13 +20,14 @@ processes MINC files.
     - utils.py
     - utils.pyc  ??
     - xfmjoin 
-    - MAGetbrain ?? 
+    - MAGetbrain ?? for qbatch  
     - targetimage.mnc (if target image is provided)
     - targetmask.mnc (if target image is provided)
-    
-    
-    
-To run 
+ 
+- FSL - for sienax
+- minc tool box
+- octave - for xfmavg? 
+- python
 
 """
 
@@ -278,8 +279,6 @@ def call_longitudinal():
       job_list.append('./longitudinal.py longitudinal %s' %inputname)
   submit_jobs('lng', 'nuc_t2*', job_list)
   return
-
-
 
 
 
