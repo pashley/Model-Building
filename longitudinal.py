@@ -25,47 +25,48 @@ def nlreg(subject):
 
 
 def preprocess_time2(inputname):
-  execute('nu_correct %s/time2/%s.mnc %s/time2/%s_nuc.mnc' %(inputname, inputname, inputname, inputname))
+  execute('nu_correct inputs/%s.mnc %s/NUC_time2/%s.mnc' %(inputname, inputname[0:-2], inputname))
   return
 
 
 def longitudinal(inputname):
   # rigid body 6-parameter transformation of time2_nuc to time1_lsq12 
-  execute('bestlinreg -lsq6 -clob %s/time2/%s_nuc.mnc %s/time1/%s_lsq12.mnc time2to1.xfm'%(inputname, inputname, inputname, inputname, inputname))  
-  execute('mincresample -transformation time2to1.xfm time2_nuc.mnc time2_rigid.mnc -like time1_lsq12.mnc')
+  execute('bestlinreg -lsq6 -clob %s/NUC_time2/%s.mnc %s/output_lsq12/%s_lsq12.mnc %s/lin_tfiles/time2to1.xfm'%(inputname[0:-2], inputname, inputname[0:-2], inputname[0:-2], inputname[0:-2]))  
+  execute('mincresample -transformation %s/lin_tfiles/time2to1.xfm %s/NUC_time2/%s.mnc %s/output_lsq6/time2_lsq6.mnc -like %s/output_lsq12/%s_lsq2.mnc' 
+          %(inputname[0:-2], inputname[0:-2], inputname, inputname[0:-2], inputname[0:-2], inputname[0:-2]))
 
 
   # nonlinear registration of time1_lsq12 to time2_rigid 
-  execute('mincANTS 3 -m PR[time1_lsq12.mnc,time2_rigid.mnc,1,4] \
+  execute('mincANTS 3 -m PR[%s/output_lsq12/%s_lsq12.mnc, %s/output_lsq6/time2_lsq6.mnc,1,4] \
       --number-of-affine-iterations 10000x10000x10000x10000x10000 \
       --MI-option 32x16000 \
       --affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
       --use-Histogram-Matching \
       -r Gauss[3,0] \
       -t SyN[0.5] \
-      -o %s/longitudinal/time1to2_nlin.xfm \
-      -i 100x100x100x20'%(inputname)) # use the grid from this (=Displacement volume)
+      -o %s/time1to2_nlin.xfm \
+      -i 100x100x100x20'%(inputname[0:-2], inputname[0:-2], inputname[0:-2], inputname[0:-2])) # use the grid from this (=Displacement volume)
   
 
   # Jacobian determinant of the deformation field (to detect volumetric changes)
-  execute('mincblob -determinant long/time1to2_nlin_grid_0.mnc long/det.mnc')
+  execute('mincblob -determinant %s/time1to2_nlin_grid_0.mnc %s/det.mnc' %(inputname[0:-2], inputname[0:-2]))
 
   # warp back to the nonlinear from time1 ??? model space
-  execute('mincANTS 3 -m PR[det.mnc,nonlin4avg.mnc,1,4] \
+  execute('mincANTS 3 -m PR[%s/det.mnc,avgimages/nonlin4avg.mnc,1,4] \
       --number-of-affine-iterations 10000x10000x10000x10000x10000 \
       --MI-option 32x16000 \
       --affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
       --use-Histogram-Matching \
       -r Gauss[3,0] \
       -t SyN[0.5] \
-      -o long/det2model_nlin.xfm \
-      -i 100x100x100x20')
-  execute('mincresample -transformation det2model.xfm det.mnc det2model.mnc -like model.mnc')
+      -o %s/det2model_nlin.xfm \
+      -i 100x100x100x20' %(inputname[0:-2], inputname[0:-2]))
+  execute('mincresample -transformation %s/det2model_nlin.xfm %s/det.mnc %s/det2model.mnc -like avgimages/nonlin4avg.mnc' %(inputname[0:-2], inputname[0:-2], inputname[0:-2]))
   
   # blur
-  execute('mincblur -fwhm 4 det2model.mnc det1')
-  execute('mincblur -fwhm 6 det1_blur.mnc det2')
-  execute('mincblur -fwhm 8 det2_blur.mnc det3')
+  #execute('mincblur -fwhm 4 det2model.mnc det1')
+  #execute('mincblur -fwhm 6 det1_blur.mnc det2')
+  #execute('mincblur -fwhm 8 det2_blur.mnc det3')
   return
 
 
