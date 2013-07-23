@@ -116,7 +116,7 @@ def call_preprocess2():
  
 def nonpairwise():
   """ Sets up the non-pairwise 12-parameter registration stage.
-  This is the alternative to pairwise 2-parameter registrations (when there are too many inputs,for instance)"""
+  This is the alternative to pairwise 12-parameter registrations (when there are too many inputs,for instance)"""
   # PART 1: calls lsq12_reg 
   job_list = []
   for sourcename in listofinputs:     
@@ -284,16 +284,15 @@ def call_longitudinal():
    # time-2 inputs must end in "_2", all this is based on that
   job_list = []
   for inputname in listofinputs_time2:
-    if not os.path.exists(inputname[0:-2] + '/NUC_time2'):
-      mkdirp(inputname[0:-2] + '/NUC_time2')
-    if not os.path.exists('%s/NUC_time2/%s.mnc' %(inputname[0:-2], inputname)):
+    if not os.path.exists(inputname[0:-2] + '/longitudinal'):
+      mkdirp(inputname[0:-2] + '/longitudinal')
+    if not os.path.exists('%s/longitudinal/%s_nuc.mnc' %(inputname[0:-2], inputname)):
       job_list.append('./longitudinal.py preprocess_time2 %s' %inputname)
   submit_jobs('nuc_t2','s6_*',job_list) #TODO: fix dependency name
   
-  
   job_list = []
-  for inputname in listofinputs:
-    if not os.path.exists('%s/det3_blur.mnc'):
+  for inputname in listofinputs_time2:
+    if not os.path.exists('%s/longitudinal/det3_blur.mnc'):
       job_list.append('./longitudinal.py longitudinal %s' %inputname)
   submit_jobs('lng', 'nuc_t2*', job_list)
   return
@@ -348,13 +347,13 @@ if __name__ == '__main__':
   parser.add_argument("-ants", action="store_true", 
                       help="4 nonlinear registrations: (mincANTS, resample, average)x4")
   parser.add_argument("-ants_stage", choices=['1','2','3','4'], 
-                      help="run a single interation of mincANTS")
+                      help="run a single iteration of mincANTS")
   parser.add_argument("-f", action="store_true",
                       help="final stats: deformation fields, determinant")
   parser.add_argument("batch_system", choices=['sge', 'pbs', 'local'],
                       help="batch system to process jobs")
   parser.add_argument("-l", action="store_true",
-                      help="testing longitudinal")
+                      help="longitudinal analysis (for time-1 and time-2 images")
   parser.add_argument("-random_target", action="store_true",
                       help="randomly select one input to be target image")
   parser.add_argument("-landmark",action="store_true",
@@ -395,16 +394,10 @@ if __name__ == '__main__':
     for subject in listofinputs:
       # distinguish between the time-1 and time-2 images
       if subject[-2:] == '_2':
-        print subject
         listofinputs_time2.append(subject)
   
     for subject in listofinputs_time2:
-      listofinputs.remove(subject)
-    print listofinputs
-    print len(listofinputs)
-    print listofinputs_time2
-    print len(listofinputs_time2)
-    
+      listofinputs.remove(subject)   
     inputfile2 = open('inputlist_time2.xfm', 'w')
     inputfile2.write("\n".join(listofinputs_time2))
     inputfile2.close()    
@@ -416,7 +409,6 @@ if __name__ == '__main__':
   inputfile.write("\n".join(listofinputs))
   inputfile.close()
   
-
 
   if args.check_inputs:
     sys.exit(1)
