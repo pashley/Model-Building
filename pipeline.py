@@ -311,6 +311,24 @@ def landmark():
   submit_jobs('lndmk', 's6_*', job_list)    
   return
 
+def call_asymm():
+  for inputname in listofinputs:
+    if not os.path.exists(inputname):
+      mkdirp(inputname)
+      mkdirp(inputname + '/NUC')
+      mkdirp(inputname + '/lin_tfiles')
+      mkdirp(inputname + '/output_lsq9')
+      mkdirp(inputname + '/output_lsq6')
+      mkdirp(inputname + '/nlin_tfiles')
+      mkdirp(inputname + '/stats')
+  
+  job_list = []
+  for inputname in listofinputs:
+    if not os.path.exists('%s/stats/%s_det_in_model_space.mnc' %(inputname, inputname)):
+      job_list.append('./asymm.py asymmetric_analysis %s' %inputname)
+  submit_jobs('asymm','something',job_list)    
+  return
+
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -356,8 +374,10 @@ if __name__ == '__main__':
                       help="longitudinal analysis (for time-1 and time-2 images")
   parser.add_argument("-random_target", action="store_true",
                       help="randomly select one input to be target image")
-  parser.add_argument("-landmark",action="store_true",
+  parser.add_argument("-landmark", action="store_true",
                       help="landmark-based facial feature analysis")
+  parser.add_argument("-asymm", action="store_true", 
+                      help="asymmetric analysis")
   
   args = parser.parse_args()
   batch_system = args.batch_system
@@ -413,6 +433,9 @@ if __name__ == '__main__':
   if args.check_inputs:
     sys.exit(1)
   
+  if args.asymm:
+    call_asymm()
+    sys.exit(1)
 
   count = len(listofinputs)  # number of inputs to process
 
