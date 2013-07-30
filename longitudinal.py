@@ -16,7 +16,6 @@ def preprocess_time2(inputname_time2):
   execute('nu_correct inputs/%s.mnc %s/longitudinal/%s_nuc.mnc' %(inputname_time2, inputname_time2[0:-2], inputname_time2))
   return
 
-
 def ants(from_image, to_image, outpath):
   execute('mincANTS 3 -m PR[%s,%s,1,4] \
       --number-of-affine-iterations 10000x10000x10000x10000x10000 \
@@ -29,7 +28,6 @@ def ants(from_image, to_image, outpath):
       -i 100x100x100x20' %(from_image, to_image, outpath))
   return 
 
-
 def longitudinal(inputname_time2):
   inputname = inputname_time2[0:-2]
   # rigid body 6-parameter transformation of time2_nuc to time1_lsq12 
@@ -41,9 +39,10 @@ def longitudinal(inputname_time2):
   ants('%s/output_lsq12/%s_lsq12.mnc' %(inputname, inputname), '%s/longitudinal/time2_lsq6.mnc' %inputname, '%s/longitudinal/time1to2_nlin.xfm' %inputname)
   # use grid from this ^ (= Displacement volume)
  
- 
+  
   # Jacobian determinant of the deformation field (to detect volumetric changes)
   execute('mincblob -clob -determinant %s/longitudinal/time1to2_nlin_grid_0.mnc %s/longitudinal/det.mnc' %(inputname, inputname))
+
 
   # warp back to the nonlinear from time1 ??? model space
   ants('%s/longitudinal/det.mnc' %inputname, 'avgimages/nonlin4avg.mnc', '%s/longitudinal/det2model_nlin.xfm' %inputname)
@@ -55,25 +54,7 @@ def longitudinal(inputname_time2):
   execute('mincblur -clob -fwhm 8 %s/longitudinal/det2_blur.mnc %s/longitudinal/det3' %(inputname, inputname))
   return
 
-#execute('mincANTS 3 -m PR[%s/output_lsq12/%s_lsq12.mnc, %s/longitudinal/time2_lsq6.mnc,1,4] \
-      #--number-of-affine-iterations 10000x10000x10000x10000x10000 \
-      #--MI-option 32x16000 \
-      #--affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
-      #--use-Histogram-Matching \
-      #-r Gauss[3,0] \
-      #-t SyN[0.5] \
-      #-o %s/longitudinal/time1to2_nlin.xfm \
-      #-i 100x100x100x20'%(inputname, inputname, inputname, inputname)) # use the grid from this (=Displacement volume)
 
-#execute('mincANTS 3 -m PR[%s/longitudinal/det.mnc,avgimages/nonlin4avg.mnc,1,4] \
-    #--number-of-affine-iterations 10000x10000x10000x10000x10000 \
-    #--MI-option 32x16000 \
-    #--affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
-    #--use-Histogram-Matching \
-    #-r Gauss[3,0] \
-    #-t SyN[0.5] \
-    #-o %s/longitudinal/det2model_nlin.xfm \
-    #-i 100x100x100x20' %(inputname, inputname))
 
 if __name__ == '__main__':
   cmd = sys.argv[1]

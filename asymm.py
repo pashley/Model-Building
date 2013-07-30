@@ -8,19 +8,6 @@ from utils import *
 import sys
 
 
-def create_dirs(inputname):
-  if not os.path.exists(inputname):
-    mkdirp(inputname)
-    mkdirp(inputname + '/NUC')
-    mkdirp(inputname + '/lin_tfiles')
-    mkdirp(inputname + '/output_lsq9')
-    mkdirp(inpurname + '/output_lsq6')
-    mkdirp(inputname + '/nlin_tfiles')
-    mkdipr(inputname + '/stats')
-  return 
-
-
-
 
 def asymmetric_analysis(inputname):
   # 1) correct each native MRI volume for intensity nonuniformities (due to MRI gradient inhomogeneities)
@@ -57,15 +44,23 @@ def asymmetric_analysis(inputname):
                         -o %s/nlin_tfiles/%s_nlin.xfm \
                         -i 100x100x100x20' %(inputname, inputname, inputname, inputname, inputname, inputname))
   
+  # mincblur assumes a 3D minc file, but the grids are 4D????
+  
   # 6) blur each nonlinear transformation with 8 mm Gaussian kernel in each dimension
-  if not os.path.exists('%s/nlin_tfiles/%s_nlin_grid_0_blur.mnc' %(inputname, inputname)):
-    execute('mincblur -fwhm 8 %s/nlin_tfiles/%s_nlin_grid_0.mnc %s/nlin_tfiles/%s_nlin_grid_0' %(inputname, inputname, inputname, inputname))
+  #if not os.path.exists('%s/nlin_tfiles/%s_nlin_grid_0_blur.mnc' %(inputname, inputname)):
+    #execute('mincblur -fwhm 8 %s/nlin_tfiles/%s_nlin_grid_0.mnc %s/nlin_tfiles/%s_nlin_grid_0' %(inputname, inputname, inputname, inputname))
+    
+    
   
   # 7) Get Jacobian determinant of each transformation 
   if not os.path.exists('%s/stats/%s_det.mnc' %(inputname, inputname)):
-    execute('mincblob -determinant %s/nlin_tfiles/%s_nlin_grid_0_blur.mnc %s/stats/%s_det.mnc' %(inputname, inputname, inputname,inputname))
+    execute('mincblob -determinant %s/nlin_tfiles/%s_nlin_grid_0.mnc %s/stats/%s_det.mnc' %(inputname, inputname, inputname,inputname))
+    
+  # blur now?
+  if not os.path.exists('%s/stats/%s_det_blur.mnc' %(inputname, inputname)):
+    execute('mincblur -fwhm 8 %s/stats/%s_det.mnc %s/stats/%s_det' %(inputname, inputname, inputname, inputname))
 
-  # 8) nonlinearly transform Jacobian determinatns to MNI space using the nonlinear transfomation that matches each flipped input volume to the ICBM 152 template
+  # 8) nonlinearly transform Jacobian determinants to MNI space using the nonlinear transfomation that matches each flipped input volume to the ICBM 152 template
   if not os.path.exists('%s/nlin_tfiles/f2model_nlin.xfm' %inputname):
     execute('mincANTS 3 -m PR[%s/output_lsq6/%s_flipped_lsq6.mnc,targetimage.mnc,1,4] \
                         --number-of-affine-iterations 10000x10000x10000x10000x10000 \
@@ -83,7 +78,6 @@ def asymmetric_analysis(inputname):
 if __name__ == '__main__':
   cmd = sys.argv[1]
   
-  if cmd == 'create_dirs':
-    create_dirs(sys.argv[2])
-  elif cmd == 'asymmetric_analysis':
+  if cmd == 'asymmetric_analysis':
     asymmetric_analysis(sys.argv[2])
+  

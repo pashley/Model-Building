@@ -9,12 +9,12 @@ import sys
 import random
 import tempfile
 
-""" ROUGH DRAFT OF THIS DESCRIPTION
+"""  
 Model-building pipeline
 
 This pipeline takes in a set of images and processes them both linearly and 
-nonlinearly to produce a model representing the average of the population.
-Deformation between each subject and the model are also  
+nonlinearly to produce an average population model of either the brain or cranifacial structure.
+.....
 
 To run the pipeline (pipeline.py),
 A) the following scripts must be present in the same directory containing pipeline.py:
@@ -27,7 +27,7 @@ A) the following scripts must be present in the same directory containing pipeli
 B) the following modules must be loaded
      - python
      - FSL
-     - minc tools box ?? real name??
+     - minc toolbox 
      - octave
 
 C) all subjects (minc images) one wishes to process must be in a directory called 
@@ -37,7 +37,7 @@ D) the target image and target mask (for the linear 6-parameter registration)
    must located in the directory containing pipeline.py and be named 
    targetimage.mnc and targetmask.mnc, respectively. 
    
-   If either file is missing, errors will ensue. Alternatively, the 
+   If either file is missing, errors will occur. Alternatively, the 
    "-random_target" command line option will randomly select a subject to be the 
    target. When using this option, ensure targetimage.mnc and targetmask.mnc do
    not exist within the directory (or else silent errors will ensue).   
@@ -45,7 +45,8 @@ D) the target image and target mask (for the linear 6-parameter registration)
 
 
 def submit_jobs(jobname, depends, job_list):
-  """ Submits a list of jobs to the batch system specified by the user """
+  # Submits a list of jobs to the batch system specified by the user 
+  
   # proceed to submitting if there is at least one job in the list 
   if len(job_list) >= 1:     
     
@@ -57,8 +58,8 @@ def submit_jobs(jobname, depends, job_list):
           thejobname = jobname + "_" + command_split[2] # the input's name is the 2nd argument in the command 
         else:
           thejobname = jobname
-        #print thejobname  + " " + command    
-        execute('sge_batch -J %s -H "%s" %s' %(thejobname, depends, command))
+        print thejobname  + " " + command    
+        #execute('sge_batch -J %s -H "%s" %s' %(thejobname, depends, command))
     
     elif batch_system == 'pbs':
       # create a temporary file with the list of jobs to submit to qbatch
@@ -69,7 +70,6 @@ def submit_jobs(jobname, depends, job_list):
        
       if depends[-2] != '_':            # sometimes dependency names without the underscore aren't recognized on scinet
         depends = depends[0:-1] + "_*"  # so, add the underscore to dependency names that don't have one 
-        print depends
       batchsize = 8
       if len(job_list) == 1:
         time = "1:00:00"  # default walltime for 1 batch of 1 tasks
@@ -84,11 +84,9 @@ def submit_jobs(jobname, depends, job_list):
   return
 
 
-
-
 def call_preprocess():
-  """Calls the preprocess stage for every input and submits the jobs"""
- 
+  # Calls the preprocess stage for every input and submits the jobs
+  create_dirs('preprocess')
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
@@ -100,8 +98,8 @@ def call_preprocess():
 
 
 def call_preprocess2():
-  """ Calls the Part 2 of the preprocessing stage 
-  Executed for craniofacial structure image processing or when the target image is a randomly selected subject"""
+  # Calls the Part 2 of the preprocessing stage 
+  # Executed for craniofacial structure image processing or when the target image is a randomly selected subject
   job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
   submit_jobs('s1_b', 's1_a_*', job_list)
   
@@ -115,10 +113,13 @@ def call_preprocess2():
 
  
 def nonpairwise():
-  """ Sets up the non-pairwise 12-parameter registration stage.
-  This is the alternative to pairwise 12-parameter registrations (when there are too many inputs,for instance)"""
+  # Sets up the non-pairwise 12-parameter registration stage.
+  # This is the alternative to pairwise 12-parameter registrations (when there are too many inputs,for instance)
+  
+  create_dirs('lsq12n')
   # PART 1: calls lsq12_reg 
   job_list = []
+  print "targetname == %s" %targetname
   for sourcename in listofinputs:     
     if sourcename != targetname: 
       if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
@@ -140,12 +141,12 @@ def nonpairwise():
     
  
 def pairwise():
-  """ Sets up the pairwise 12-parameter registration stage"""
+  # Sets up the pairwise 12-parameter registration stage
+  
+  create_dirs('lsq12p')
   # PART 1: calls lsq12_reg
   job_list = []
   for sourcename in listofinputs:
-    if not os.path.exists(sourcename + '/pairwise_tfiles'):
-      mkdirp(sourcename + '/pairwise_tfiles')    # create directory
     for targetname in listofinputs:
       if sourcename != targetname and not os.path.exists('%s/pairwise_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
         job_list.append('./process.py lsq12_reg %s %s pairwise_tfiles' %(sourcename, targetname))      
@@ -161,7 +162,7 @@ def pairwise():
 
 
 def call_linavg():
-  """Average linearly processed images & check for completion of the lsq12 stage """
+  # Average linearly processed images & check for completion of the lsq12 stage 
   job_list = ['./process.py linavg_and_check output_lsq12 lsq12 linavg.mnc']
   if not os.path.exists('avgimages/linavg.mnc'):
     submit_jobs('linavg', 's3_*', job_list)
@@ -169,7 +170,7 @@ def call_linavg():
 
   
 def ANTS_and_avg(number, sourcefolder,inputregname, targetimage, iterations):
-  """ Sets up the nonlinear processing stage which uses mincANTS"""
+  # Sets up the nonlinear processing stage which uses mincANTS
   # PART 1: calls ants
   job_list = []
   for inputname in listofinputs:
@@ -185,7 +186,8 @@ def ANTS_and_avg(number, sourcefolder,inputregname, targetimage, iterations):
  
   
 def call_ANTS(iteration):
-  """Calls each iteration of mincANTS with the appropriate parameters"""
+  # Calls each iteration of mincANTS with the appropriate parameters
+  create_dirs('ANTS')
   if iteration == '1' or iteration == 'all':
     ANTS_and_avg('1', 'output_lsq12', 'lsq12', 'linavg.mnc', '100x1x1x1')
   if iteration == '2' or iteration == 'all':
@@ -198,7 +200,8 @@ def call_ANTS(iteration):
 
 
 def tracc_resmp(stage, fwhm, iterations, step, model):
-  """Sets up the nonlinear processing stage which uses minctracc"""
+  # Sets up the nonlinear processing stage which uses minctracc
+
   # PART 1: calls model_blur
   #job_list = ['mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4])]
   job_list =['./process.py model_blur %s %s' %(fwhm, model)]
@@ -218,10 +221,8 @@ def tracc_resmp(stage, fwhm, iterations, step, model):
 
 
 def call_tracc():
-  """Calls each iteration of mintracc with the appropriate parameters"""
-  for inputname in listofinputs:
-    if not os.path.exists(inputname + '/minctracc_out'):
-      mkdirp(inputname + '/minctracc_out')   
+  # Calls each iteration of mintracc with the appropriate parameters
+  create_dirs('tracc')   
   #tracc_resmp(stage, Gaussian blur, iterations, step size, model name) 
   tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
   tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
@@ -233,7 +234,8 @@ def call_tracc():
 
 
 def call_final_stats():
-  """Calls the deformation fields stage""" 
+  # Calls the deformation fields stage
+  create_dirs('final_stats')
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
@@ -247,19 +249,19 @@ def call_final_stats():
 
 
 def run_all(option):
-  '''Run the entire pipeline with the option selected.
-  rp = pairwise lsq12 
-  rpt = pairwise lsq12 & minctracc
-  rn = non-pairwise lsq12 (& mincANTS)
-  rnt = non-pairwise lsq12 & minctracc
-  rcl = landmarked-based facial feature analysis (default: mincANTS)
-  '''
+  # Run the entire pipeline with the option selected.
+  # rp = pairwise lsq12 
+  # rpt = pairwise lsq12 & minctracc
+  # rn = non-pairwise lsq12 (& mincANTS)
+  # rnt = non-pairwise lsq12 & minctracc
+  # rcl = landmarked-based facial feature analysis (default: mincANTS)
+  
   call_preprocess()
   if option == 'rp' or option == 'rpt':
     pairwise()
   elif option == 'rn' or option == 'rnt':
     nonpairwise()
-  else:               # when no option is specified the method of lsq12 registrations is dependent on the number of inputs
+  else:   # when no option is specified the method of lsq12 registrations is dependent on the number of inputs
     if count <= 300:
       pairwise()
     elif count > 300:
@@ -270,26 +272,29 @@ def run_all(option):
   else:
     call_ANTS('all')  # default nonlinear 
   call_final_stats()
-  
-  if option == 'rcl':
-    landmark()
+  #if option == 'rcl':
+    #print "landmark"
+    #landmark()
   return
 
 
 def call_longitudinal():
-  # run entire pipeline on time-1
-  run_all('all')
+  # Calls the longitudinal analysis option between time-1 and time-2 image
   
-   # nu_correct time_2 images
-   # time-2 inputs must end in "_2", all this is based on that
+  # run entire pipeline on time-1 images 
+  run_all('all')
+   
+  # time-2 inputs must end in "_2", all this is based on that
+  # nu_correct time_2 images  
   job_list = []
   for inputname in listofinputs_time2:
     if not os.path.exists(inputname[0:-2] + '/longitudinal'):
-      mkdirp(inputname[0:-2] + '/longitudinal')
+      mkdirp(inputname[0:-2] + '/longitudinal')        # create directory
     if not os.path.exists('%s/longitudinal/%s_nuc.mnc' %(inputname[0:-2], inputname)):
       job_list.append('./longitudinal.py preprocess_time2 %s' %inputname)
   submit_jobs('nuc_t2','s6_*',job_list) #TODO: fix dependency name
   
+  # longitudinal analysis 
   job_list = []
   for inputname in listofinputs_time2:
     if not os.path.exists('%s/longitudinal/det3_blur.mnc'):
@@ -298,20 +303,22 @@ def call_longitudinal():
   return
 
 
-
 def landmark():
   job_list = ['./landmark_facial.py warp_landmarked_2_model']
   if not os.path.exists('landmarked_nonlin_model.mnc'):
-    submit_jobs('lnmk_model','s6_*', job_list)
+    submit_jobs('lndmk_model','s6_*', job_list)
     
   job_list = []
   for inputname in listofinputs:
-    if not os.path.exists('%s/landmarked/%s_landmarked.mnc' %(inputname, inputname)):
-      job_list.append('./landmark_facial.py warp_model_2_subject %s' %inputname)
-  submit_jobs('lndmk', 's6_*', job_list)    
+    if not os.path.exists('%s/%s.tag' %(inputname, inputname)):
+      job_list.append('./landmark_facial.py model_to_subject %s' %inputname)
+  submit_jobs('lndmk', 'lndmk_model*', job_list)    
   return
 
 def call_asymm():
+  # Calls the asymmetrical analysis option
+  
+  # create directory structure
   for inputname in listofinputs:
     if not os.path.exists(inputname):
       mkdirp(inputname)
@@ -322,6 +329,7 @@ def call_asymm():
       mkdirp(inputname + '/nlin_tfiles')
       mkdirp(inputname + '/stats')
   
+  # run the analysis
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/stats/%s_det_in_model_space.mnc' %(inputname, inputname)):
@@ -330,54 +338,84 @@ def call_asymm():
   return
 
 
+def create_dirs(stage):
+  dirs = []
+  if stage == 'preprocess':
+    dirs.append('NUC')
+    dirs.append('NORM')
+    dirs.append('masks')
+    dirs.append('lin_tfiles')
+    dirs.append('output_lsq6')   
+  elif stage == 'lsq12p':
+    dirs.append('pairwise_tfiles')
+    dirs.append('output_lsq12')
+  elif stage == 'lsq12n':
+    dirs.append('output_lsq12')
+  elif stage == 'ANTS':
+    dirs.append('nonlin_tfiles')
+    dirs.append('nonlin_timages')
+  elif stage == 'tracc':
+    dirs.append('minctracc_out')
+  elif stage == 'final_stats':
+    dirs.append('final_stats')
+
+  for directory in dirs:
+    for inputname in listofinputs:
+      if not os.path.exists(inputname + '/%s' %directory):
+        mkdirp(inputname + '/%s' %directory)
+  return
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
-  parser.add_argument("-face", action="store_true",
-                      help="craniofacial structure imaging (default brain imaging)")
-  parser.add_argument("-prefix", action="append",    # possible to specify more than one prefix
+  # Configuration options
+  group = parser.add_argument_group('Configuration options')
+  group.add_argument("batch_system", choices=['sge', 'pbs', 'local'],
+                        help="batch system to process jobs")  
+  group.add_argument("-face", action="store_true",
+                      help="craniofacial structure imaging [default: brain imaging]")
+  group.add_argument("-prefix", action="append",    # can specify more than one prefix
                       help= "specify subset(s) of inputs within the inputs directory to process")
-  parser.add_argument("-check_inputs", action="store_true",
+  group.add_argument("-check_inputs", action="store_true",
                       help="generate a file with the list of inputs to be processed")
-  parser.add_argument("-rp", action="store_true",
-                    help="run pipeline with pairwise lsq12 registrations")
-  parser.add_argument("-rn", action= "store_true",
-                      help="run pipeline with non-pairwise lsq12 registrations")
-  parser.add_argument("-rt", action="store_true",
-                      help="run pipeline with minctracc")
-  parser.add_argument("-rpt", action="store_true",
-                      help="run pipeline with pairwise lsq12 registrations and minctracc")
-  parser.add_argument("-rnt", action="store_true", 
-                      help="run pipeline with non-pairwise lsq12 registrations and minctracc")
-  parser.add_argument("-rcl", action="store_true", 
-                      help="run pipeline with craniofacial structure imaging & landmark-based facial feature analysis")
-  parser.add_argument("-p", action="store_true", 
-                      help="preprocessing: correct, normalize, mask, lsq6, resample")
-  parser.add_argument("-lsq12",action="store_true",
-                      help="lsq12 registrations (method based on number of inputs)")
-  parser.add_argument("-lsq12p", action="store_true",
+  group.add_argument("-random_target", action="store_true",
+                        help="randomly select one input to be target image\
+                        for linear processing")  
+  
+  # Running individual stages of the pipeline
+  group = parser.add_argument_group('Options for running indiviudal stages of pipeline')
+  
+  group.add_argument("-p", action="store_true", 
+                      help="preprocessing")
+  group.add_argument("-lsq12",action="store_true",
+                      help="lsq12 registrations (method based on number of inputs) [default]")
+  group.add_argument("-lsq12p", action="store_true",
                        help="pairwise lsq12 registrations")
-  parser.add_argument("-lsq12n", action="store_true",
+  group.add_argument("-lsq12n", action="store_true",
                       help="non-pairwise lsq12 registrations")
-  parser.add_argument("-linavg",action="store_true", 
+  group.add_argument("-linavg",action="store_true", 
                       help="average linearly processed images")
-  parser.add_argument("-tracc",action="store_true",
+  group.add_argument("-tracc",action="store_true",
                       help="minctracc nonlinear transformations (6 iterations with preset parameters)")
-  parser.add_argument("-ants", action="store_true", 
-                      help="4 nonlinear registrations: (mincANTS, resample, average)x4")
-  parser.add_argument("-ants_stage", choices=['1','2','3','4'], 
+  group.add_argument("-ants", action="store_true", 
+                      help="4 nonlinear registrations: (mincANTS, resample, average)x4 [default]")
+  group.add_argument("-ants_stage", choices=['1','2','3','4'], 
                       help="run a single iteration of mincANTS")
-  parser.add_argument("-f", action="store_true",
+  group.add_argument("-f", action="store_true",
                       help="final stats: deformation fields, determinant")
-  parser.add_argument("batch_system", choices=['sge', 'pbs', 'local'],
-                      help="batch system to process jobs")
-  parser.add_argument("-l", action="store_true",
-                      help="longitudinal analysis (for time-1 and time-2 images")
-  parser.add_argument("-random_target", action="store_true",
-                      help="randomly select one input to be target image")
-  parser.add_argument("-landmark", action="store_true",
+  
+  # Other pipeline options
+  group = parser.add_argument_group('Other pipeline options')
+  group.add_argument("-l", action="store_true",
+                      help="longitudinal analysis (for time-1 and time-2 images)")
+  group.add_argument("-landmark", action="store_true",
                       help="landmark-based facial feature analysis")
-  parser.add_argument("-asymm", action="store_true", 
+  group.add_argument("-asymm", action="store_true", 
                       help="asymmetric analysis")
+  group.add_argument("-run_with", action="store_true", 
+                     help="run the entire pipeline with the specified option(s). Possible options:\
+                     {-lsq12p or -lsq12n} and/or  {-ants or -tracc}")
+  #group.add_argument("-face_lndmk", action="store_true", 
+                     #help= "run pipeline with craniofacial structure imaging & landmark-based facial feature analysis")
   
   args = parser.parse_args()
   batch_system = args.batch_system
@@ -438,29 +476,29 @@ if __name__ == '__main__':
     sys.exit(1)
 
   count = len(listofinputs)  # number of inputs to process
-
-  for subject in listofinputs:
-    if not os.path.exists(subject + '/'):
-      mkdirp(subject)                          
-      mkdirp(subject + '/NUC')                
-      mkdirp(subject + '/NORM')
-      mkdirp(subject + '/masks')              
-      mkdirp(subject + '/lin_tfiles')          
-      mkdirp(subject + '/output_lsq6') 
-      mkdirp(subject + '/output_lsq12')                        
-      mkdirp(subject + '/nonlin_tfiles')      # don't need when minctracc
-      mkdirp(subject + '/nonlin_timages')     # don't need when minctracc
-      mkdirp(subject + '/final_stats')
   
   if not os.path.exists('avgimages'):
-    mkdirp('avgimages') 
-    
+    mkdirp('avgimages')   
     
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
-  
-    
-  if args.p:
+
+  if args.run_with: 
+    if args.lsq12p and not args.tracc:                      # pairwise & ANTS
+      run_all('rp')
+    elif args.lsq12p and not args.tracc and args.ants:      # pairwise & ANTS 
+      run_all('rp')
+    elif args.lsq12n and not args.tracc:                    # nonpairwise & ANTS
+      run_all('rn')
+    elif args.lsq12n and not args.tracc and args.ants:      # nonpairwise & ANTS
+      run_all('rn')
+    elif args.lsq12p and args.tracc:                        # pairwise & tracc
+      run_all('rpt')
+    elif args.lsq12n and args.tracc:                        # nonpairwise & tracc 
+      run_all('rnt')
+    elif args.tracc:                                        # tracc
+      run_all('rt')  
+  elif args.p:
     call_preprocess()
   elif args.lsq12:
     if count > 300:
@@ -481,24 +519,13 @@ if __name__ == '__main__':
     call_final_stats()
   elif args.landmark:
     landmark()
-  elif args.rp:       # run pipeline with pairwise & mincANTS
-    run_all('rp')
-  elif args.rn:       # run pipeline with nonpairwise & mincANTS
-    run_all('rn')
-  elif args.rt:
-    run_all('rt')
-  elif args.rpt:      # run pipeline with pairwise & minctracc
-    run_all('rpt')
-  elif args.rnt:      # run pipeline with nonpairwise & minctracc   
-    run_all('rnt')
   elif args.rcl:
     image_type = 'face'
     run_all('rcl')
   elif args.tracc:
     call_tracc()
   elif args.l:
-    call_longitudinal()
-      
+    call_longitudinal()      
   else:               # execute all stages when no particular stage is specified
     run_all('all')
      
