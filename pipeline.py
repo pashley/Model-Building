@@ -75,7 +75,7 @@ def submit_jobs(jobname, depends, job_list):
         time = "1:00:00"  # default walltime for 1 batch of 1 tasks
       else:
         time = "2:00:00"  # default walltime for 1 batch of 8 tasks
-      execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends,  basename(cmdfileinfo[1]), batchsize, time))
+      execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, basename(cmdfileinfo[1]), batchsize, time))
       os.remove(cmdfile.name)
     
     elif batch_system == 'local':  # run locally
@@ -91,7 +91,7 @@ def call_preprocess():
   for inputname in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-  submit_jobs('s1_a', "something_*", job_list) # fix dependency?
+  submit_jobs('s1_a', "something*", job_list) # fix dependency?
   if target_type == 'random' or image_type == 'face':
     call_preprocess2()
   return 
@@ -137,6 +137,9 @@ def nonpairwise():
     if not os.path.exists('%s/output_lsq12/%s_lsq12.mnc' %(sourcename, sourcename)):
       job_list.append('./process.py lsq12reg_and_resample %s' %sourcename)
   submit_jobs('s3', 'avgsize*', job_list)
+  
+  # PART 4: calls linavg_and_check
+  call_linavg()
   return  
     
  
@@ -158,6 +161,9 @@ def pairwise():
     if not os.path.exists('%s/output_lsq12/%s_lsq12.mnc' %(inputname,inputname)):
       job_list.append('./process.py xfmavg_and_resample %s' %inputname)
   submit_jobs('s3', 's2_*', job_list)
+  
+  # PART 3: calls linavg_and_check  
+  call_linavg()
   return
 
 
@@ -175,7 +181,8 @@ def ANTS_and_avg(number, sourcefolder,inputregname, targetimage, iterations):
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/nonlin_timages/%s_nonlin%s.mnc' %(inputname,inputname, number)):
-      job_list.append('./process.py ants %s %s/%s/%s_%s.mnc %s %s %s' %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations))
+      job_list.append('./process.py ants_and_resample %s %s/%s/%s_%s.mnc %s %s %s' 
+                      %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations))
   submit_jobs('reg%s' %number, '%s*' %targetimage[0:-4], job_list)
  
  # PART 2: calls mnc_avg
@@ -266,7 +273,6 @@ def run_all(option):
       pairwise()
     elif count > 300:
       nonpairwise()
-  call_linavg()
   if option == 'rpt' or option == 'rnt' or option == 'rt':
     call_tracc()
   else:
@@ -304,14 +310,15 @@ def call_longitudinal():
 
 
 def landmark():
-  job_list = ['./landmark_facial.py warp_landmarked_2_model']
-  if not os.path.exists('landmarked_nonlin_model.mnc'):
-    submit_jobs('lndmk_model','s6_*', job_list)
+  # Calls the landmark facial feature analysis option
+  job_list = ['./process.py tag_nlinavg']
+  if not os.path.exists('model_to_nlinavg.xfm'):
+    submit_jobs('ldmk_model','s6_*', job_list)
     
   job_list = []
   for inputname in listofinputs:
-    if not os.path.exists('%s/%s.tag' %(inputname, inputname)):
-      job_list.append('./landmark_facial.py model_to_subject %s' %inputname)
+    if not os.path.exists('%s/%s_landmarks.tag' %(inputname, inputname)):
+      job_list.append('./process.py tag_subject %s' %inputname)
   submit_jobs('lndmk', 'lndmk_model*', job_list)    
   return
 
@@ -392,8 +399,8 @@ if __name__ == '__main__':
                        help="pairwise lsq12 registrations")
   group.add_argument("-lsq12n", action="store_true",
                       help="non-pairwise lsq12 registrations")
-  group.add_argument("-linavg",action="store_true", 
-                      help="average linearly processed images")
+  #group.add_argument("-linavg",action="store_true", 
+                      #help="average linearly processed images")
   group.add_argument("-tracc",action="store_true",
                       help="minctracc nonlinear transformations (6 iterations with preset parameters)")
   group.add_argument("-ants", action="store_true", 
@@ -405,7 +412,7 @@ if __name__ == '__main__':
   
   # Other pipeline options
   group = parser.add_argument_group('Other pipeline options')
-  group.add_argument("-l", action="store_true",
+  group.add_argument("-longitudinal", action="store_true",
                       help="longitudinal analysis (for time-1 and time-2 images)")
   group.add_argument("-landmark", action="store_true",
                       help="landmark-based facial feature analysis")
@@ -414,8 +421,7 @@ if __name__ == '__main__':
   group.add_argument("-run_with", action="store_true", 
                      help="run the entire pipeline with the specified option(s). Possible options:\
                      {-lsq12p or -lsq12n} and/or  {-ants or -tracc}")
-  #group.add_argument("-face_lndmk", action="store_true", 
-                     #help= "run pipeline with craniofacial structure imaging & landmark-based facial feature analysis")
+  
   
   args = parser.parse_args()
   batch_system = args.batch_system
@@ -448,10 +454,13 @@ if __name__ == '__main__':
   #inputfile.close
 
   listofinputs_time2 = []
-  if args.l:
+  if args.longitudinal:
     for subject in listofinputs:
       # distinguish between the time-1 and time-2 images
-      if subject[-2:] == '_2':
+      # expected that time-2 image filenames have the additional "_2" suffix
+      # Ex. time-1 image: H001.mnc
+      #     time-2 image: H001_2.mnc
+      if subject[-2:] == '_2':      
         listofinputs_time2.append(subject)
   
     for subject in listofinputs_time2:
@@ -509,22 +518,22 @@ if __name__ == '__main__':
     pairwise()
   elif args.lsq12n:
     nonpairwise()
-  elif args.linavg:
-    call_linavg()
+  #elif args.linavg:
+    #call_linavg()
   elif args.ants:
     call_ANTS('all')
   elif args.ants_stage: 
     call_ANTS(args.ants_stage)
   elif args.f:
     call_final_stats()
-  elif args.landmark:
+  elif args.landmark:   # landmark-based facial feature analysis
     landmark()
-  elif args.rcl:
-    image_type = 'face'
-    run_all('rcl')
+  #elif args.rcl:
+    #image_type = 'face'
+    #run_all('rcl')
   elif args.tracc:
     call_tracc()
-  elif args.l:
+  elif args.longitudinal:
     call_longitudinal()      
   else:               # execute all stages when no particular stage is specified
     run_all('all')

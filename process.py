@@ -14,22 +14,32 @@ import shutil
 A series a functions which execute the stages of the Model-Building Pipeline when 
 called upon by pipeline.py
 
-          Stage                            Associated Functions (called by pipeline.py)           
-1) Preprocessing                       preprocess, autocrop, preprocess2
+            Stage                           Associated Functions (called by pipeline.py)           
+1  Preprocessing                       preprocess, autocrop, preprocess2
 
-2) Pairwise linear 12-parameter        lsq12_reg, xfmavg_and_resample, linavg_and_check
+2  Pairwise linear 12-parameter        lsq12_reg, xfmavg_and_resample, linavg_and_check
    registrations (3 Parts)
    
    Non-Pairwise linear 12-parameter    lsq12_reg, xfmavg_inv_resample, lsq12reg_and_resample, linavg_and_check 
    registrations (4 Parts)               
 
-3) Nonlinear processing                ants
+3  Nonlinear processing                ants_and_resample
    using mincANTS 
    
    Nonlinear processing                model_blur, tracc 
    using minctracc
 
-4) Deformation fields                  deformation
+4  Deformation fields                  deformation
+
+
+   Landmarked-based facial feature     (functions from stages 1-4), tag_nlinavg, tag_subject
+   analysis (optional)
+   
+   Longitudinal analysis (optional)
+
+   Asymmetrical analysis (optional)
+
+        
 """
 
 def mask(inputname, inputfolder):
@@ -75,7 +85,7 @@ def preprocess(subject, image_type, target_type):
     # themax[0:-1] is the string of the numerical value without the newline character 
     execute('minccalc -clob -expression "10000*(A[0]-0)/(%s-%s)" \
                       %s/NUC/%s.mnc %s/NORM/%s.mnc'
-            %(subject, subject, themax[0:-1], themin[0:-1], subject, subject)) 
+            %(themax[0:-1], themin[0:-1], subject, subject, subject, subject)) 
     mask(subject, 'NORM') # use the normalized image to generate the mask
     if target_type == 'given': # if target image is provided by the user 
       execute('bestlinreg -clob -lsq6 \
@@ -96,7 +106,7 @@ def preprocess(subject, image_type, target_type):
     themin = execute('mincstats -min -quiet %s/NUC/%s_face.mnc' %(subject, subject))
     execute('minccalc -clob -expression "10000*(A[0]-0)/(%s-%s)" \
                       %s/NUC/%s_face.mnc %s/NORM/%s_face.mnc' 
-            %(subject, subject, themax[0:-1], themin[0:-1], subject, subject))
+            %(themax[0:-1], themin[0:-1], subject, subject, subject, subject))
   return
 
 
@@ -144,10 +154,9 @@ def preprocess2(sourcename, targetname, image_type):
 
 def lsq12_reg(sourcename, targetname, outputfolder):
   # STAGE 2 (Pairwise/Non-Pairwise Registrations): Part 1 (of 3) / Part 1 (of 4) 
-  # 
-  # Estimates the linear 12-parameter transformation of each subject to
-  #   a) all the other subjects (pairwise) or 
-  #   b) the randomly selected target subject (non-pairwise)
+  #   Estimates the linear 12-parameter transformation of each subject to
+  #     a) all the other subjects (pairwise) or 
+  #     b) the randomly selected target subject (non-pairwise)
   execute('bestlinreg -lsq12 %s/output_lsq6/%s_lsq6.mnc %s/output_lsq6/%s_lsq6.mnc %s/%s/%s_%s_lsq12.xfm'
           %(sourcename, sourcename, targetname,targetname, sourcename, outputfolder, sourcename, targetname))
   return
@@ -155,9 +164,8 @@ def lsq12_reg(sourcename, targetname, outputfolder):
 
 def xfmavg_and_resample(inputname):
   # STAGE 2 (Pairwise Registrations): Part 2 (of 3)
-  # 
-  # Averages the transformation (xfm) files of each subject to all the other 
-  # subjects and resamples (i.e. apply the subject's average transformation)
+  #   Averages the transformation (xfm) files of each subject to all the other 
+  #   subjects and resamples (i.e. apply the subject's average transformation)
   execute('xfmavg -clob %s/pairwise_tfiles/* %s/pairwise_tfiles/%s.xfm'
           %(inputname, inputname, inputname))
   resample('%s/pairwise_tfiles/%s.xfm' %(inputname, inputname),      # xfm
@@ -168,9 +176,8 @@ def xfmavg_and_resample(inputname):
    
 def xfmavg_inv_resample(targetname):
   # STAGE 2 (Non-Pairwise Registrations): Part 2 (of 4)
-  # 
-  # Averages all 12-parameter transformation (xfm) files. Inverts the average 
-  # transformation and applies it to the randomly selected target subject
+  #   Averages all 12-parameter transformation (xfm) files. Inverts the average 
+  #   transformation and applies it to the randomly selected target subject
   execute('xfmavg -clob */lin_tfiles/*_*_lsq12.xfm lsq12avg.xfm')
   execute('xfminvert -clob lsq12avg.xfm lsq12avg_inverse.xfm')
   resample('lsq12avg_inverse.xfm',                                  # xfm
@@ -181,9 +188,8 @@ def xfmavg_inv_resample(targetname):
 
 def lsq12reg_and_resample(sourcename):
   # STAGE 2 (Non-Pairwise Registrations): Part 3 (of 4)
-  # 
-  # Estimates the linear 12-parameter transformation of each input to the 
-  # 'average size' generated from Part 2 & resamples.
+  #   Estimates the linear 12-parameter transformation of each input to the 
+  #   'average size' generated from Part 2 & resamples.
   execute('bestlinreg -clob -lsq12 %s/output_lsq6/%s_lsq6.mnc avgsize.mnc %s/lin_tfiles/%s_lsq12.xfm'
           %(sourcename, sourcename, sourcename, sourcename))
   resample('%s/lin_tfiles/%s_lsq12.xfm' %(sourcename, sourcename),    # xfm
@@ -194,9 +200,8 @@ def lsq12reg_and_resample(sourcename):
 
 def linavg_and_check(inputfolder, inputreg, outputname):
   # STAGE 2 (Pairwise/Non-Pairwise Registrations): Part 3 (of 3) / Part 4 (of 4)   
-  # 
-  # Creates a linear model by averaging the linearly processed images. 
-  # Also checks for the successful completion of the 12-parameter registration stage.
+  #   Creates a linear model by averaging the linearly processed images. 
+  #   Also checks for the successful completion of the 12-parameter registration stage.
   mnc_avg(inputfolder, inputreg, outputname)
   try:
     execute('minccomplete avgimages/linavg.mnc')   # check for average 
@@ -226,23 +231,38 @@ def mnc_avg(inputfolder,inputreg,outputname):
   execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder,inputreg,outputname))
   return
 
-
-def ants(inputname, sourcepath, targetimage, number, iterations):
-  # STAGE 3 : Nonlinear processing using mincANTS
-  #
-  # 1) Estimates the nonlinear transformation of each subject to the model 
-  #    created from the previous iteration of mincANTS. For the first iteration,
-  #    subjects are registered to the linear model.
-  # 2) Resamples.
-  execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
+def mincANTS(from_image, to_image, output_xfm, iterations):
+  # Executes nonlinear registrations using mincANTS
+  execute('mincANTS 3 -m PR[%s,%s,1,4] \
       --number-of-affine-iterations 10000x10000x10000x10000x10000 \
       --MI-option 32x16000 \
       --affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
       --use-Histogram-Matching \
       -r Gauss[3,0] \
       -t SyN[0.5] \
-      -o %s/nonlin_tfiles/%s_nonlin%s.xfm \
-      -i %s' %(sourcepath, targetimage, inputname, inputname, number, iterations))
+      -o %s \
+      -i %s' %(from_image, to_image, output_xfm, iterations))
+  return 
+
+def ants_and_resample(inputname, sourcepath, targetimage, number, iterations):
+  # STAGE 3 : Nonlinear processing using mincANTS
+  #   1) Estimates the nonlinear transformation of each subject to the model 
+  #      created from the previous iteration of mincANTS. For the first iteration,
+  #      subjects are registered to the linear model.
+  #   2) Resamples.
+  from_image = sourcepath
+  to_image = 'avgimages/%s' %targetimage
+  output_xfm = '%s/nonlin_tfiles/%s_nonlin%s.xfm' %(inputname, inputname, number)
+  mincANTS(from_image, to_image, output_xfm, iterations)
+  #execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
+      #--number-of-affine-iterations 10000x10000x10000x10000x10000 \
+      #--MI-option 32x16000 \
+      #--affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
+      #--use-Histogram-Matching \
+      #-r Gauss[3,0] \
+      #-t SyN[0.5] \
+      #-o %s/nonlin_tfiles/%s_nonlin%s.xfm \
+      #-i %s' %(sourcepath, targetimage, inputname, inputname, number, iterations))
   resample('%s/nonlin_tfiles/%s_nonlin%s.xfm' %(inputname, inputname, number),
            sourcepath, '%s/nonlin_timages/%s_nonlin%s.mnc'
            %(inputname,inputname,number))   
@@ -257,16 +277,15 @@ def model_blur(fwhm, model):
 
 def tracc(inputname, num, fwhm, iterations, step, model):
   # STAGE 3: Nonlinear processing using minctracc
-  #
-  # 1) Gaussian kernel blurring of the linearly processed (12-parameter) subject
-  #    images with the specified FWHM.
-  # 2) Estimates the nonlinear transformation of each subject to the model 
-  #    created from the previous iteration. For each iteration except the first,
-  #    the blurred subject image, blurred model image and the transformation file
-  #    from the previous iteration are inputted. For the first iteration, the blurred
-  #    subject image is registered to the blurred linear model with no 
-  #    input transformation file. 
-  # 3) Resamples
+  #   1) Gaussian kernel blurring of the linearly processed (12-parameter) subject
+  #      images with the specified FWHM.
+  #   2) Estimates the nonlinear transformation of each subject to the model 
+  #      created from the previous iteration. For each iteration except the first,
+  #      the blurred subject image, blurred model image and the transformation file
+  #      from the previous iteration are inputted. For the first iteration, the blurred
+  #      subject image is registered to the blurred linear model with no 
+  #      input transformation file. 
+  #   3) Resamples
   
   lttdiam = int(step)*3  # lattice diameter is 3 x step size
   if not os.path.exists('%s/minctracc_out/%s_lsq12_%s_blur.mnc' %(inputname, inputname,fwhm)):
@@ -292,11 +311,13 @@ def tracc(inputname, num, fwhm, iterations, step, model):
       -stiffness 1 \
       -weight 1 \
       -similarity 0.3 \
-      -transformation %s/minctracc_out/%s_out%s.xfm %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' 
-      %(iterations, step, step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
-  resample('%s/minctracc_out/%s_out%s.xfm' %(inputname,inputname,num),
-           '%s/output_lsq12/%s_lsq12.mnc' %(inputname, inputname),
-           '%s/minctracc_out/%s_nlin%s.mnc' %(inputname,inputname,num))
+      -transformation %s/minctracc_out/%s_out%s.xfm \
+      %s/minctracc_out/%s_lsq12_%s_blur.mnc avgimages/%s_blur.mnc %s/minctracc_out/%s_out%s.xfm' 
+      %(iterations, step, step, step, lttdiam, lttdiam, lttdiam, inputname, inputname, int(num)-1, 
+        inputname, inputname, fwhm, model[0:-4], inputname, inputname, num))
+  resample('%s/minctracc_out/%s_out%s.xfm' %(inputname,inputname,num),   # xfm
+           '%s/output_lsq12/%s_lsq12.mnc' %(inputname, inputname),       # source 
+           '%s/minctracc_out/%s_nlin%s.mnc' %(inputname,inputname,num))  # output
   return
 
 
@@ -335,7 +356,35 @@ def deformation(inputname):
   execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' 
           %(inputname, inputname, inputname, inputname))  
   return 
-    
+
+def tag_nlinavg():
+  # Landmark-based facial feature analysis: Part 1 (of 2)
+  #   Transforms the model tags (landmarks) by the input transform that maps the 
+  #   model image to the nonlinear average image.
+  
+  from_image = 'sys_881_face_model.mnc' #TODO: filename for now
+  to_image = 'avgimages/nonlin4avg.mnc' # when minctracc, nonlin6avg.mnc??
+  output_xfm = 'model_to_nlinavg.xfm'
+  iterations = '100x100x100x20'
+  mincANTS(from_image, to_image, output_xfm, iterations) 
+  
+  input_tag = 'face_tags_sys881_June21_2012.tag' #TODO: filename for now
+  input_xfm = output_xfm
+  output_tag = 'nlin_face_tags'
+  execute('transform_tags %s %s %s' %(input_tag, input_xfm, output_tag))
+  return
+
+def tag_subject(inputname):
+  # Landmark-based facial feature analysis: Part 2 (of 2)
+  #   Warps the landmarks to each subject using the inverse of the nonlinear transformation 
+  #   that maps the subject to the nonlinear average image.
+  input_tag = 'nlin_face_tags.tag'
+  input_xfm = '%s/nonlin_tfiles/%s_nonlin4.xfm' %(inputname, inputname) # maps craniofacial structure of subject to average image
+  output_tag = '%s/%s_landmarks' %(inputname, inputname)
+  iterations = '100x100x100x20'
+  execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) # use inverse of the transform (to bring landmarks to subject space)
+  return
+
 if __name__ == '__main__':
   cmd = sys.argv[1]
   
@@ -357,11 +406,15 @@ if __name__ == '__main__':
     xfmavg_and_resample(sys.argv[2])
   elif cmd == 'mnc_avg':
     mnc_avg(sys.argv[2], sys.argv[3], sys.argv[4])
-  elif cmd == 'ants':
-    ants(sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],sys.argv[6])
+  elif cmd == 'ants_and_resample':
+    ants_and_resample(sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],sys.argv[6])
   elif cmd == 'deformation':
     deformation(sys.argv[2])
   elif cmd == 'tracc':
     tracc(sys.argv[2],sys.argv[3],sys.argv[4],sys.argv[5],sys.argv[6],sys.argv[7])
   elif cmd == 'model_blur':
     model_blur(sys.argv[2], sys.argv[3])
+  elif cmd == 'tag_nlinavg':
+    tag_nlinavg()
+  elif cmd == 'tag_subject':
+    tag_subject(sys.argv[2])
