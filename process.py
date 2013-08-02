@@ -206,7 +206,7 @@ def linavg_and_check(inputfolder, inputreg, outputname):
   try:
     execute('minccomplete avgimages/linavg.mnc')   # check for average 
   except subprocess.CalledProcessError:
-    execute("qdel reg*, nonlin*, s6*, tr*, blur*")
+    execute("qdel reg*, nlin*, s6*, tr*, blur*")
     #print e.output
   return
 
@@ -252,7 +252,7 @@ def ants_and_resample(inputname, sourcepath, targetimage, number, iterations):
   #   2) Resamples.
   from_image = sourcepath
   to_image = 'avgimages/%s' %targetimage
-  output_xfm = '%s/nonlin_tfiles/%s_nonlin%s.xfm' %(inputname, inputname, number)
+  output_xfm = '%s/nlin_tfiles/%s_nlin%s.xfm' %(inputname, inputname, number)
   mincANTS(from_image, to_image, output_xfm, iterations)
   #execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
       #--number-of-affine-iterations 10000x10000x10000x10000x10000 \
@@ -261,10 +261,10 @@ def ants_and_resample(inputname, sourcepath, targetimage, number, iterations):
       #--use-Histogram-Matching \
       #-r Gauss[3,0] \
       #-t SyN[0.5] \
-      #-o %s/nonlin_tfiles/%s_nonlin%s.xfm \
+      #-o %s/nlin_tfiles/%s_nlin%s.xfm \
       #-i %s' %(sourcepath, targetimage, inputname, inputname, number, iterations))
-  resample('%s/nonlin_tfiles/%s_nonlin%s.xfm' %(inputname, inputname, number),
-           sourcepath, '%s/nonlin_timages/%s_nonlin%s.mnc'
+  resample('%s/nlin_tfiles/%s_nlin%s.xfm' %(inputname, inputname, number),
+           sourcepath, '%s/nlin_timages/%s_nlin%s.mnc'
            %(inputname,inputname,number))   
   return
   
@@ -335,19 +335,19 @@ def deformation(inputname):
     # can't access minctracc output grid, so assume mincANTS was executed
     # join all the nonlinear transformation files
     xfms = ""
-    for xfm in glob.glob('%s/nonlin_tfiles/*.xfm' %inputname):  
+    for xfm in glob.glob('%s/nlin_tfiles/*.xfm' %inputname):  
       if xfm[-11:] != 'inverse.xfm':
         xfms += xfm
         xfms += " "
     execute('xfmjoin %s %s/%s_merged2.xfm' %(xfms, inputname, inputname))
-    outfile = open('test.xfm', 'w')
+    outfile = open('xfms.xfm', 'w')
     outfile.write(xfms)
     outfile.close()      
     sys.exit(1)
-    #execute('xfmjoin %s/nonlin_tfiles/%s_nonlin1.xfm \
-                     #%s/nonlin_tfiles/%s_nonlin2.xfm \
-                     #%s/nonlin_tfiles/%s_nonlin3.xfm \
-                     #%s/nonlin_tfiles/%s_nonlin4.xfm \
+    #execute('xfmjoin %s/nlin_tfiles/%s_nlin1.xfm \
+                     #%s/nlin_tfiles/%s_nlin2.xfm \
+                     #%s/nlin_tfiles/%s_nlin3.xfm \
+                     #%s/nlin_tfiles/%s_nlin4.xfm \
                      #%s/%s_merged2.xfm' 
                      #%(inputname, inputname, inputname, inputname, inputname, 
                        #inputname, inputname, inputname, inputname, inputname))
@@ -375,9 +375,9 @@ def tag_nlinavg():
   #   model image to the nonlinear average image.
   
   from_image = 'sys_881_face_model.mnc' #TODO: filename for now
-  to_image = 'avgimages/nonlin4avg.mnc' # when minctracc, nonlin6avg.mnc??
+  to_image = 'avgimages/nlin4avg.mnc' # when minctracc, nlin6avg.mnc??
   output_xfm = 'model_to_nlinavg.xfm'
-  iterations = '100x100x100x20'
+  iterations = '100x1x1x1'
   mincANTS(from_image, to_image, output_xfm, iterations) 
   
   input_tag = 'face_tags_sys881_June21_2012.tag' #TODO: filename for now
@@ -392,9 +392,9 @@ def tag_subject(inputname):
   #   Warps the landmarks to each subject using the inverse of the nonlinear transformation 
   #   that maps the subject to the nonlinear average image.
   input_tag = 'nlin_face_tags.tag'
-  input_xfm = '%s/nonlin_tfiles/%s_nonlin4.xfm' %(inputname, inputname) # maps craniofacial structure of subject to average image
+  input_xfm = '%s/nlin_tfiles/%s_nlin4.xfm' %(inputname, inputname) # maps craniofacial structure of subject to average image
   output_tag = '%s/%s_landmarks' %(inputname, inputname)
-  iterations = '100x100x100x20'
+  iterations = '100x1x1x1'
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) # use inverse of the transform (to bring landmarks to subject space)
   return
 
@@ -425,7 +425,7 @@ def longitudinal(inputname_time2):
   mincANTS('%s/output_lsq12/%s_lsq12.mnc' %(inputname, inputname), # from_image
            '%s/longitudinal/time2_lsq6.mnc' %inputname,            # to_image
            '%s/longitudinal/time1to2_nlin.xfm' %inputname,         # output_xfm 
-           '100x100x100x20')                                       # iterations
+           '100x1x1x1')                                            # iterations
   
   # 4) Compute the Jacobian determinant of the output grid (displacement volume/deformation field) from mincANTS (to detect volumetric change)
   execute('mincblob -clob -determinant \
@@ -434,15 +434,15 @@ def longitudinal(inputname_time2):
   
   # 5) Warp back to the model space (from time-1?? or the targetimage.mnc?
   mincANTS('%s/longitudinal/det.mnc' %inputname,             # from_image
-           'avgimages/nonlin4avg.mnc',                       # to_image
+           'avgimages/nlin4avg.mnc',                         # to_image
            '%s/longitudinal/det2model_nlin.xfm' %inputname,  # output_xfm
-           '100x100x100x20')                                 # iterations
+           '100x1x1x1')                                      # iterations
   
   execute('mincresample -clob \
                         -transformation %s/longitudinal/det2model_nlin.xfm \
                         %s/longitudinal/det.mnc \
                         %s/longitudinal/det2model.mnc \
-                        -like avgimages/nonlin4avg.mnc' %(inputname, inputname, inputname))  #TODO: minctracc? will have nonlin6avg.mnc
+                        -like avgimages/nlin4avg.mnc' %(inputname, inputname, inputname))  #TODO: minctracc? will have nlin6avg.mnc
   # 6) Blur
   execute('mincblur -clob -fwhm 4 %s/longitudinal/det2model.mnc %s/longitudinal/det_fwhm4' %(inputname, inputname))
   execute('mincblur -clob -fwhm 6 %s/longitudinal/det2model.mnc %s/longitudinal/det_fwhm6' %(inputname, inputname))
@@ -482,7 +482,7 @@ def asymmetric_analysis(inputname):
     mincANTS('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname),          # from_image
              '%s/output_lsq6/%s_flipped_lsq6.mnc' %(inputname, inputname),  # to_image
              '%s/nlin_tfiles/%s_nlin.xfm' %(inputname, inputname),          # output_xfm
-             '100x100x100x20')                                              # iterations
+             '100x1x1x1')                                                   # iterations
     
   # 6) Get Jacobian determinant of each transformation
   execute('mincblob -clob -determinant %s/nlin_tfiles/%s_nlin_grid_0.mnc %s/stats/%s_det.mnc' %(inputname, inputname, inputname,inputname))
@@ -495,7 +495,7 @@ def asymmetric_analysis(inputname):
     mincANTS('%s/output_lsq6/%s_flipped_lsq6.mnc' %(inputname,inputname),    # from_image
              'targetimage.mnc',                                              # to_image
              '%s/nlin_tfiles/f2model_nlin.xfm' %inputname,                   # output_xfm 
-             '100x100x100x20')                                               # iterations
+             '100x1x1x1')                                                    # iterations
   execute('mincresample -clob -transformation %s/nlin_tfiles/f2model_nlin.xfm \
                         %s/stats/%s_det.mnc \
                         %s/stats/%s_det_in_model_space.mnc \

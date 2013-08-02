@@ -57,7 +57,26 @@ Longitudinal analysis (for time-1 and time-2 images)
 
 Asymmetrical analysis
      -
-            
+
+***********CAUTION 
+- All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any 
+  files and/or folders in the directory that pipeline.py is being executed.
+  
+  To avoid errors, remove or rename any files and/or folders with names that could be flagged 
+  by the following dependency names:
+     - avgsize*
+     - blurmod*
+     - linavg*
+     - lndmk_model*
+     - nlin*
+     - reg*
+     - s1*
+     - s2*
+     - s3*
+     - s6*
+     - tr*    
+     
+****************            
 """
 
 
@@ -210,15 +229,15 @@ def ANTS_and_avg(number, sourcefolder,inputregname, targetimage, iterations):
   # PART 1: calls ants
   job_list = []
   for inputname in listofinputs:
-    if not os.path.exists('%s/nonlin_timages/%s_nonlin%s.mnc' %(inputname,inputname, number)):
+    if not os.path.exists('%s/nlin_timages/%s_nlin%s.mnc' %(inputname,inputname, number)):
       job_list.append('./process.py ants_and_resample %s %s/%s/%s_%s.mnc %s %s %s' 
                       %(inputname, inputname, sourcefolder, inputname, inputregname, targetimage, number, iterations))
   submit_jobs('reg%s' %number, '%s*' %targetimage[0:-4], job_list)
  
  # PART 2: calls mnc_avg
-  job_list = ['./process.py mnc_avg nonlin_timages nonlin%s nonlin%savg.mnc' %(number, number)]
-  if not os.path.exists('avgimages/nonlin%savg.mnc' % number):
-    submit_jobs('nonlin%savg' %number, 'reg%s_*' %number, job_list)
+  job_list = ['./process.py mnc_avg nlin_timages nlin%s nlin%savg.mnc' %(number, number)]
+  if not os.path.exists('avgimages/nlin%savg.mnc' % number):
+    submit_jobs('nlin%savg' %number, 'reg%s_*' %number, job_list)
   return
  
   
@@ -228,11 +247,11 @@ def call_ANTS(iteration):
   if iteration == '1' or iteration == 'all':
     ANTS_and_avg('1', 'output_lsq12', 'lsq12', 'linavg.mnc', '100x1x1x1')
   if iteration == '2' or iteration == 'all':
-    ANTS_and_avg('2', 'nonlin_timages', 'nonlin1', 'nonlin1avg.mnc', '100x20x1')
+    ANTS_and_avg('2', 'nlin_timages', 'nlin1', 'nlin1avg.mnc', '100x20x1')
   if iteration == '3' or iteration == 'all':
-    ANTS_and_avg('3', 'nonlin_timages', 'nonlin2', 'nonlin2avg.mnc', '100x5')
+    ANTS_and_avg('3', 'nlin_timages', 'nlin2', 'nlin2avg.mnc', '100x5')
   if iteration == '4' or iteration == 'all':
-    ANTS_and_avg('4', 'nonlin_timages', 'nonlin3', 'nonlin3avg.mnc', '5x20')
+    ANTS_and_avg('4', 'nlin_timages', 'nlin3', 'nlin3avg.mnc', '5x20')
   return
 
 
@@ -242,8 +261,12 @@ def tracc_resmp(stage, fwhm, iterations, step, model):
   # PART 1: calls model_blur
   #job_list = ['mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4])]
   job_list =['./process.py model_blur %s %s' %(fwhm, model)]
-  if not os.path.exists('avgimages/nonlin%savg.mnc' %stage):
-    submit_jobs('blurmod%s' %stage, "%s*" %model[0:-4], job_list)
+  if not os.path.exists('avgimages/nlin%savg_tracc.mnc' %stage):
+    if stage == 1:
+      dependency = model[0:-4]
+    else:
+      dependency = model[0:8]
+    submit_jobs('blurmod%s' %stage, "%s*" %dependency, job_list)
     
     # PART 2: calls tracc
     job_list = []
@@ -252,21 +275,27 @@ def tracc_resmp(stage, fwhm, iterations, step, model):
     submit_jobs('tr%s' %stage, 'blurmod%s*' %stage, job_list)
     
     # PART 3: calls mnc_avg
-    job_list = ['./process.py mnc_avg minctracc_out nlin%s nonlin%savg.mnc' %(stage, stage)]
-    submit_jobs('nonlin%savg' %stage, 'tr%s_*' %stage, job_list)    
+    job_list = ['./process.py mnc_avg minctracc_out nlin%s nlin%savg_tracc.mnc' %(stage, stage)]
+    submit_jobs('nlin%savg' %stage, 'tr%s_*' %stage, job_list)    
   return
 
 
-def call_tracc():
+def call_tracc(iteration):
   # Calls each iteration of mintracc with the appropriate parameters
   create_dirs('tracc')   
   #tracc_resmp(stage, Gaussian blur, iterations, step size, model name) 
-  tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
-  tracc_resmp(2, 8, 30, 8, 'nonlin1avg.mnc')
-  tracc_resmp(3, 8, 30, 4, 'nonlin2avg.mnc') 
-  tracc_resmp(4, 4, 30, 4, 'nonlin3avg.mnc')
-  tracc_resmp(5, 4, 10, 2, 'nonlin4avg.mnc')
-  tracc_resmp(6, 2, 10, 2, 'nonlin5avg.mnc')  
+  if iteration == '1' or iteration == 'all':
+    tracc_resmp(1, 16, 30, 8, 'linavg.mnc')
+  if iteration == '2' or iteration == 'all':
+    tracc_resmp(2, 8, 30, 8, 'nlin1avg_tracc.mnc')
+  if iteration == '3' or iteration == 'all':  
+    tracc_resmp(3, 8, 30, 4, 'nlin2avg_tracc.mnc') 
+  if iteration == '4' or iteration == 'all':
+    tracc_resmp(4, 4, 30, 4, 'nlin3avg_tracc.mnc')
+  if iteration == '5' or iteration == 'all':
+    tracc_resmp(5, 4, 10, 2, 'nlin4avg_tracc.mnc')
+  if iteration == '6' or iteration == 'all':
+    tracc_resmp(6, 2, 10, 2, 'nlin5avg_tracc.mnc')  
   return
 
 
@@ -278,9 +307,9 @@ def call_final_stats():
     if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
       job_list.append( './process.py deformation %s' %inputname)
   if batch_system == 'pbs':           #TODO: fix depends name
-    submit_jobs('s6', 'nonlin*_*', job_list)
+    submit_jobs('s6', 'nlin*_*', job_list)
   else:
-    submit_jobs('s6', 'nonlin*', job_list)
+    submit_jobs('s6', 'nlin*', job_list)
   # dependency ???
   return
 
@@ -323,7 +352,7 @@ def call_asymm():
   for inputname in listofinputs:
     if not os.path.exists('%s/stats/%s_det_in_model_space.mnc' %(inputname, inputname)):
       job_list.append('./asymm.py asymmetric_analysis %s' %inputname)
-  submit_jobs('asymm','something',job_list)    
+  submit_jobs('asymm','something*',job_list)    
   return
 
 
@@ -344,8 +373,8 @@ def create_dirs(stage):
     dirs.append('output_lsq12')
   
   elif stage == 'ANTS':
-    dirs.append('nonlin_tfiles')
-    dirs.append('nonlin_timages')
+    dirs.append('nlin_tfiles')
+    dirs.append('nlin_timages')
   
   elif stage == 'tracc':
     dirs.append('minctracc_out')
@@ -389,7 +418,7 @@ def run_all():
   
   # select method for nonlinear processing
   if nlin == 'tracc':
-    call_tracc()
+    call_tracc('all')
   elif nlin == 'ants':
     call_ANTS('all')
     
@@ -432,8 +461,10 @@ if __name__ == '__main__':
                       help="non-pairwise 12-parameter registrations")
   group.add_argument("-tracc",action="store_true",
                       help="nonlinear processing using minctracc (6 iterations with preset parameters) [default: mincANTS]")
+  group.add_argument("-tracc_stage", choices=['1','2','3','4','5','6'], 
+                      help="run a single iteration of minctracc")
   group.add_argument("-ants", action="store_true", 
-                      help="4 nonlinear registrations: (mincANTS, resample, average)x4")
+                      help="nonlinear processing using mincANTS (4 iterations)")
   group.add_argument("-ants_stage", choices=['1','2','3','4'], 
                       help="run a single iteration of mincANTS")
   group.add_argument("-stats", action="store_true",
@@ -529,6 +560,9 @@ if __name__ == '__main__':
 
   count = len(listofinputs)  # number of inputs to process
   
+  for inputname in listofinputs:
+    if not os.path.exists(inputname + '/'):
+      mkdirp(inputname)  
   if not os.path.exists('avgimages'):
     mkdirp('avgimages')   
 
@@ -539,23 +573,25 @@ if __name__ == '__main__':
   
   # Run single stages   
   elif args.preprocess:    
-    call_preprocess()         # preprocessing stage
-  elif args.lsq12:            # 12-parameter registrations (method based on the number of inputs)
+    call_preprocess()            # preprocessing stage
+  elif args.lsq12:               # 12-parameter registrations (method based on the number of inputs)
     if count > 300:            
       nonpairwise()
     elif count <= 300:
       pairwise()    
-  elif args.lsq12p:           # pairwise 12-parameter registrations 
+  elif args.lsq12p:              # pairwise 12-parameter registrations 
     pairwise()
   elif args.lsq12n:
-    nonpairwise()             # non-pairwise 12-parameter registrations
-  elif args.ants:             # mincANTS (all 4 stages) 
+    nonpairwise()                # non-pairwise 12-parameter registrations
+  elif args.ants:                # mincANTS (all 4 stages) 
     call_ANTS('all')
-  elif args.ants_stage:       # mincANTS (single stage)
+  elif args.ants_stage:          # mincANTS (single stage)
     call_ANTS(args.ants_stage)
-  elif args.tracc:            # mintracc
-    call_tracc()  
-  elif args.stats:            # final stats 
+  elif args.tracc:               # mintracc
+    call_tracc('all')  
+  elif args.tracc_stage:         # minctracc (single stage)
+      call_tracc(args.tracc_stage)
+  elif args.stats:               # final stats 
     call_final_stats()
     
   # Run additional analysis options
