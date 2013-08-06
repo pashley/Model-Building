@@ -35,9 +35,9 @@ called upon by pipeline.py
    Landmarked-based facial feature     (functions from stages 1-4), tag_nlinavg, tag_subject
    analysis (optional)
    
-   Longitudinal analysis (optional)
+   Longitudinal analysis (optional)    longitudinal
 
-   Asymmetrical analysis (optional)
+   Asymmetrical analysis (optional)    asymmetric_analysis
 
         
 """
@@ -167,7 +167,8 @@ def xfmavg_and_resample(inputname):
   #   Averages the transformation (xfm) files of each subject to all the other 
   #   subjects and resamples (i.e. apply the subject's average transformation)
   execute('xfmavg -clob %s/pairwise_tfiles/* %s/pairwise_tfiles/%s.xfm'
-          %(inputname, inputname, inputname))
+          %(inputname, inputname, inputname))   
+  execute('cp %s/pairwise_tfiles/%s.xfm %s/lin_tfiles/%s_lsq12.xfm' %(inputname, inputname, inputname, inputname))   
   resample('%s/pairwise_tfiles/%s.xfm' %(inputname, inputname),      # xfm
            '%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname),     # source
            '%s/output_lsq12/%s_lsq12.mnc' %(inputname, inputname))   # output 
@@ -233,15 +234,17 @@ def mnc_avg(inputfolder,inputreg,outputname):
 
 def mincANTS(from_image, to_image, output_xfm, iterations):
   # Executes nonlinear registrations using mincANTS
+
   execute('mincANTS 3 -m PR[%s,%s,1,4] \
-      --number-of-affine-iterations 10000x10000x10000x10000x10000 \
-      --MI-option 32x16000 \
-      --affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
-      --use-Histogram-Matching \
+      --number-of-affine-iterations 0 \
       -r Gauss[3,0] \
       -t SyN[0.5] \
       -o %s \
       -i %s' %(from_image, to_image, output_xfm, iterations))
+  #--number-of-affine-iterations 10000x10000x10000x10000x10000 \
+  #--MI-option 32x16000 \
+  #--affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
+  #--use-Histogram-Matching \
   return 
 
 def ants_and_resample(inputname, sourcepath, targetimage, number, iterations):
@@ -321,6 +324,7 @@ def tracc(inputname, num, fwhm, iterations, step, model):
   return
 
 
+
 def deformation(inputname):
   # STAGE 4: Generates the deformation field between the linearly processed 
   #          and nonlinearly processed images of each subject. Also outputs 
@@ -343,7 +347,6 @@ def deformation(inputname):
     outfile = open('xfms.xfm', 'w')
     outfile.write(xfms)
     outfile.close()      
-    sys.exit(1)
     #execute('xfmjoin %s/nlin_tfiles/%s_nlin1.xfm \
                      #%s/nlin_tfiles/%s_nlin2.xfm \
                      #%s/nlin_tfiles/%s_nlin3.xfm \
@@ -391,11 +394,50 @@ def tag_subject(inputname):
   # Landmark-based facial feature analysis: Part 2 (of 2)
   #   Warps the landmarks to each subject using the inverse of the nonlinear transformation 
   #   that maps the subject to the nonlinear average image.
+  
+  # Volumetric differences
+  xfms = []
+  for xfm in glob.glob('%s/nlin_tfiles/%s_nlin?.xfm' %(inputname, inputname)):
+    xfms.append(xfm)
+  xfms = " ".join(xfms) # string of nonlinear xfms  
+  # concate nonlinear transformation files only
+  execute('xfmjoin %s %s/nlin_tfiles/%s_nlin_merged.xfm' %(xfms, inputname, inputname))  
+  
   input_tag = 'nlin_face_tags.tag'
-  input_xfm = '%s/nlin_tfiles/%s_nlin4.xfm' %(inputname, inputname) # maps craniofacial structure of subject to average image
-  output_tag = '%s/%s_landmarks' %(inputname, inputname)
+  input_xfm = '%s/nlin_tfiles/%s_nlin_merged.xfm' %(inputname, inputname) # maps craniofacial structure of subject to average image
+  output_tag = '%s/%s_voldiff_landmarks' %(inputname, inputname)
   iterations = '100x1x1x1'
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) # use inverse of the transform (to bring landmarks to subject space)
+  
+  tagfile = open('%s/%s_voldiff_landmarks.tag' %(inputname, inputname), 'r')
+  csvfile = open('%s/%s_voldiff_landmarks.csv' %(inputname, inputname), 'w')
+  create_csv(tagfile, csvfile)
+  
+  # Shape & volumetric differences  
+  avg_lsq12_xfm = ' %s/lin_tfiles/%s_lsq12.xfm' %(inputname, inputname)  # average lsq12 transform file
+  xfms += avg_lsq12_xfm 
+  # concate lsq12 & nonlinear transformation files
+  execute('xfmjoin %s %s/nlin_tfiles/%s_lsq12_nlin_merged.xfm' %(xfms, inputname, inputname))
+  
+  input_xfm = '%s/nlin_tfiles/%s_lsq12_nlin_merged.xfm' %(inputname, inputname)
+  output_tag = '%s/%s_vol_shape_diff_landmarks' %(inputname, inputname)
+  execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) 
+  
+  tagfile = open('%s/%s_vol_shape_diff_landmarks.tag' %(inputname, inputname), 'r')
+  csvfile = open('%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname,'w'))
+  create_csv(tagfile, csvfile) 
+  return 
+
+
+def create_csv(tagfile, csvfile):
+  # Create a csv tag file.
+  csvfile.write("x,y,z\n")
+  for line in tagfile:
+    if len(line) > 50:
+      values = line.split()
+      thevalues = values[0] + "," + values[1] + "," + values[2]
+      csvfile.write(thevalues)
+      csvfile.write("\n")  
   return
 
 
@@ -407,10 +449,10 @@ def longitudinal(inputname_time2):
   # 1) Intensity inhomogeneity correction for time-2 images
   execute('nu_correct inputs/%s.mnc %s/longitudinal/%s_nuc.mnc' %(inputname_time2, inputname, inputname_time2))
   
-  # 2) Rigid body 6-parameter transformation of the (corrected) time-2 image to the time-1 image of every subject. 
+  # 2) Rigid body 6-parameter transformation of the (corrected) time-2 image to the (original corrected) time-1 image of every subject. 
   execute('bestlinreg -lsq6 -clob \
                       %s/longitudinal/%s_nuc.mnc \
-                      %s/output_lsq12/%s_lsq12.mnc \
+                      %s/NUC/%s.mnc \
                       %s/longitudinal/time2to1.xfm'
                       %(inputname, inputname_time2, inputname, inputname, inputname))  
   
@@ -418,11 +460,12 @@ def longitudinal(inputname_time2):
                         %s/longitudinal/time2to1.xfm \
                         %s/longitudinal/%s_nuc.mnc \
                         %s/longitudinal/time2_lsq6.mnc \
-                        -like %s/output_lsq12/%s_lsq12.mnc' 
+                        -like %s/NUC/%s.mnc' 
                         %(inputname, inputname, inputname_time2, inputname, inputname, inputname))
   
-  # 3) Nonlinear registration (with mincANTS) of time-1 to time-2
-  mincANTS('%s/output_lsq12/%s_lsq12.mnc' %(inputname, inputname), # from_image
+  # 3) Nonlinear registration (with mincANTS) of (original corrected) time-1 to (transformed) time-2 
+       
+  mincANTS('%s/NUC/%s.mnc' %(inputname, inputname),                # from_image  (nu-corrected original)
            '%s/longitudinal/time2_lsq6.mnc' %inputname,            # to_image
            '%s/longitudinal/time1to2_nlin.xfm' %inputname,         # output_xfm 
            '100x1x1x1')                                            # iterations
@@ -432,18 +475,20 @@ def longitudinal(inputname_time2):
                     %s/longitudinal/time1to2_nlin_grid_0.mnc %s/longitudinal/det.mnc' 
                     %(inputname, inputname))
   
-  # 5) Warp back to the model space (from time-1?? or the targetimage.mnc?
-  mincANTS('%s/longitudinal/det.mnc' %inputname,             # from_image
-           'avgimages/nlin4avg.mnc',                         # to_image
-           '%s/longitudinal/det2model_nlin.xfm' %inputname,  # output_xfm
-           '100x1x1x1')                                      # iterations
+  # 5) Concatenate nonlinear transformation files
+  xfms = ""
+  for xfm in glob.glob('%s/nlin_tfiles/%s_nlin?.xfm' %(inputname, inputname)):
+    xfms += xfm
+    xfms += " "
+  execute('xfmjoin %s %s/nlin_tfiles/%s_nlin_merged.xfm' %(xfms, inputname, inputname))
   
+  # 6) Warp back to the model space (generated from time-1 nonlinear processing)
   execute('mincresample -clob \
-                        -transformation %s/longitudinal/det2model_nlin.xfm \
+                        -transformation %s/nlin_tfiles/%s_nlin_merged.xfm \
                         %s/longitudinal/det.mnc \
                         %s/longitudinal/det2model.mnc \
-                        -like avgimages/nlin4avg.mnc' %(inputname, inputname, inputname))  #TODO: minctracc? will have nlin6avg.mnc
-  # 6) Blur
+                        -like avgimages/nlin4avg.mnc' %(inputname, inputname, inputname, inputname))  #TODO: minctracc? will have nlin6avg.mnc
+  # 7) Blur
   execute('mincblur -clob -fwhm 4 %s/longitudinal/det2model.mnc %s/longitudinal/det_fwhm4' %(inputname, inputname))
   execute('mincblur -clob -fwhm 6 %s/longitudinal/det2model.mnc %s/longitudinal/det_fwhm6' %(inputname, inputname))
   execute('mincblur -clob -fwhm 8 %s/longitudinal/det2model.mnc %s/longitudinal/det_fwhm8' %(inputname, inputname))
@@ -453,54 +498,23 @@ def longitudinal(inputname_time2):
 def asymmetric_analysis(inputname):
   # Asymmetrical analysis
   
-  # 1) Correct each native MRI volume for intensity nonuniformities (due to MRI gradient inhomogeneities)   
-  execute('nu_correct -clob inputs/%s.mnc %s/NUC/%s.mnc' %(inputname, inputname, inputname))
+  # flip 
+  execute('volflip -x -clob %s/output_lsq12/%s_lsq12.mnc %s/output_lsq12/%s_flipped_lsq12.mnc' %(inputname, inputname, inputname, inputname))
+  if not os.path.exists()
   
-  # 2) Linear 9-parameter transformation
-  if not os.path.exists('%s/output_lsq9/%s_lsq9.mnc' %(inputname, inputname)):
-    execute('bestlinreg -lsq9 -clob %s/NUC/%s.mnc targetimage.mnc %s/lin_tfiles/%s_lsq9.xfm' 
-            %(inputname, inputname, inputname, inputname))
-    execute('mincresample -clob -transformation %s/lin_tfiles/%s_lsq9.xfm \
-                          %s/NUC/%s.mnc %s/output_lsq9/%s_lsq9.mnc \
-                          -like targetimage.mnc' 
-                          %(inputname, inputname, inputname, inputname, inputname, inputname))
-    
-  # 3) Flip the transformed volumes along mid-sagittal plane (to create a mirror coronal image of it) 
-  execute('volflip -x -clob %s/output_lsq9/%s_lsq9.mnc %s/output_lsq9/%s_flipped_lsq9.mnc' %(inputname, inputname, inputname, inputname))
-  
-  # 4) Transform all volumes such that the mid-saggital plane is parallel to the Y-Z plane via linear 6-parameter transformation 
-  if not os.path.exists('%s/output_lsq6/%s_flipped_lsq6.mnc' %(inputname, inputname)):
-    execute('bestlinreg -lsq6 -clob %s/output_lsq9/%s_flipped_lsq9.mnc targetimage.mnc %s/lin_tfiles/%s_flipped_lsq6.xfm' %(inputname, inputname, inputname, inputname))
-    execute('mincresample -clob -transformation %s/lin_tfiles/%s_flipped_lsq6.xfm %s/output_lsq9/%s_flipped_lsq9.mnc %s/output_lsq6/%s_flipped_lsq6.mnc -like targetimage.mnc' %(inputname, inputname, inputname, inputname, inputname, inputname))
-  
-  if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
-    execute('bestlinreg -lsq6 -clob %s/output_lsq9/%s_lsq9.mnc targetimage.mnc %s/lin_tfiles/%s_lsq6.xfm' %(inputname, inputname, inputname, inputname))
-    execute('mincresample -transformation %s/lin_tfiles/%s_lsq6.xfm %s/output_lsq9/%s_lsq9.mnc %s/output_lsq6/%s_lsq6.mnc -like targetimage.mnc' %(inputname, inputname, inputname, inputname, inputname, inputname))
-  
-  # 5) Nonlinearly register each MRI volume to its respective flippped coronal image volume
+  # Nonlinearly register each MRI volume to its respective flippped coronal image volume
   if not os.path.exists('%s/nlin_tfiles/%s_nlin_grid_0.mnc' %(inputname, inputname)):
-    mincANTS('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname),          # from_image
-             '%s/output_lsq6/%s_flipped_lsq6.mnc' %(inputname, inputname),  # to_image
-             '%s/nlin_tfiles/%s_nlin.xfm' %(inputname, inputname),          # output_xfm
-             '100x1x1x1')                                                   # iterations
+    mincANTS('%s/output_lsq12/%s_lsq12.mnc' %(inputname, inputname),          # from_image
+             '%s/output_lsq12/%s_flipped_lsq12.mnc' %(inputname, inputname),  # to_image
+             '%s/asymmetrical/%s_nlin.xfm' %(inputname, inputname),           # output_xfm
+             '100x1x1x1')                                                     # iterations
     
   # 6) Get Jacobian determinant of each transformation
-  execute('mincblob -clob -determinant %s/nlin_tfiles/%s_nlin_grid_0.mnc %s/stats/%s_det.mnc' %(inputname, inputname, inputname,inputname))
+  execute('mincblob -clob -determinant %s/asymmetrical/%s_nlin_grid_0.mnc %s/asymmetrical/%s_det.mnc' %(inputname, inputname, inputname,inputname))
     
   # 7) Blur
-  execute('mincblur -clob -fwhm 8 %s/stats/%s_det.mnc %s/stats/%s_det' %(inputname, inputname, inputname, inputname))
+  execute('mincblur -clob -fwhm 8 %s/asymmetrical/%s_det.mnc %s/asymmetrical/%s_det' %(inputname, inputname, inputname, inputname))
 
-  # 8) Nonlinearly transform Jacobian determinants to MNI space using the nonlinear transfomation that matches each flipped input volume to the ICBM 152 template
-  if not os.path.exists('%s/nlin_tfiles/f2model_nlin.xfm' %inputname):
-    mincANTS('%s/output_lsq6/%s_flipped_lsq6.mnc' %(inputname,inputname),    # from_image
-             'targetimage.mnc',                                              # to_image
-             '%s/nlin_tfiles/f2model_nlin.xfm' %inputname,                   # output_xfm 
-             '100x1x1x1')                                                    # iterations
-  execute('mincresample -clob -transformation %s/nlin_tfiles/f2model_nlin.xfm \
-                        %s/stats/%s_det.mnc \
-                        %s/stats/%s_det_in_model_space.mnc \
-                        -like targetimage.mnc'            #TODO: when no targetimage.mnc ?
-                        %(inputname, inputname, inputname, inputname, inputname))
   return 
 
 
