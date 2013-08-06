@@ -424,13 +424,13 @@ def tag_subject(inputname):
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) 
   
   tagfile = open('%s/%s_vol_shape_diff_landmarks.tag' %(inputname, inputname), 'r')
-  csvfile = open('%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname,'w'))
+  csvfile = open('%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname, 'w'))
   create_csv(tagfile, csvfile) 
   return 
 
 
 def create_csv(tagfile, csvfile):
-  # Create a csv tag file.
+  # Creates a csv file with tag file
   csvfile.write("x,y,z\n")
   for line in tagfile:
     if len(line) > 50:
