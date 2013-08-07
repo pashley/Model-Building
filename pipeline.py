@@ -20,7 +20,6 @@ To run the pipeline (pipeline.py),
 A) the following scripts must be present in the same directory containing pipeline.py:
      - process.py
      - utils.py
-     - utils.pyc  ??
      - xfmjoin 
      - MAGetbrain ? for qbatch  
     
@@ -219,8 +218,7 @@ def pairwise():
 def call_linavg():
   # Average linearly processed images & check for completion of the lsq12 stage 
   job_list = ['./process.py linavg_and_check output_lsq12 lsq12 linavg.mnc']
-  if not os.path.exists('avgimages/linavg.mnc'):
-    submit_jobs('linavg', 's3_*', job_list)
+  submit_jobs('linavg', 's3_*', job_list)
   return
 
   
@@ -236,8 +234,7 @@ def ANTS_and_avg(number, sourcefolder,inputregname, targetimage, iterations):
  
  # PART 2: calls mnc_avg
   job_list = ['./process.py mnc_avg nlin_timages nlin%s nlin%savg.mnc' %(number, number)]
-  if not os.path.exists('avgimages/nlin%savg.mnc' % number):
-    submit_jobs('nlin%savg' %number, 'reg%s_*' %number, job_list)
+  submit_jobs('nlin%savg' %number, 'reg%s_*' %number, job_list)
   return
  
   
@@ -341,7 +338,7 @@ def landmark():
   for inputname in listofinputs:
     if not os.path.exists('%s/%s_landmarks.tag' %(inputname, inputname)):
       job_list.append('./process.py tag_subject %s' %inputname)
-  submit_jobs('lndmk', 'lndmk_model*', job_list)    
+  submit_jobs('lndmk', 'ldmk_model*', job_list)    
   return
 
 def call_asymm():
@@ -425,8 +422,37 @@ def run_all():
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(usage="./pipeline.py batch_system [options]")
-                                   
+  parser = argparse.ArgumentParser(usage="./pipeline.py batch_system [options]", 
+                                   formatter_class=argparse.RawDescriptionHelpFormatter,
+                                   description=textwrap.dedent('''\
+        
+        For basic operation  
+        -----------------------------------
+          Within the current directory, have  
+             1) pipeline.py, process.py, utils.py, xfmjoin.
+             2) all input images in 'inputs' directory.
+             3) targetimage.mnc & targetmask.mnc files (for linear 6-parameter 
+                registrations). Otherwise, use the '-random_target' option.
+        
+          Default stages: preprocess, lsq12, ants, stats (for brain imaging)
+ 
+        
+        For specialized options 
+        -----------------------------------
+          Landmark-based facial feature analysis
+            - Within current directory, have 
+                1) sys_881_face_model.mnc (model image)
+                2) face_tags_sys881_June21_2012.tag (model tags)
+        
+          Longitudinal analysis
+            - all time-2 input images in 'inputs' directory must end in "_2"
+              Ex. time-1 image = H001.mnc
+                  time-2 image = H001_2.mnc
+        
+          Asymmetrical analysis
+            - 
+         _______________________________________________________________________  
+         '''))                              
   # Configuration options
   group = parser.add_argument_group('Configuration options')
   group.add_argument("batch_system", choices=['sge', 'pbs', 'local'],
@@ -438,8 +464,8 @@ if __name__ == '__main__':
   group.add_argument("-check_inputs", action="store_true",
                       help="generate a file with the list of inputs to be processed")
   group.add_argument("-random_target", action="store_true",
-                        help="randomly select one input to be target image\
-                        for linear processing [default: Assumes that targetimage.mnc & targetmask.mnc files are in current directory]")
+                        help="randomly select one input to be the target image\
+                        for the linear 6-parameter processing [default: Assumes that targetimage.mnc & targetmask.mnc files are in current directory]")
   group.add_argument("-run_with", action="store_true", 
                        help="run the entire pipeline with any single stage options that are specified on the command line")  
   
@@ -449,13 +475,13 @@ if __name__ == '__main__':
   group.add_argument("-preprocess", action="store_true", 
                       help="preprocessing")
   group.add_argument("-lsq12",action="store_true",
-                      help="12-parameter registrations (method based on number of inputs) [default]")
+                      help="12-parameter registrations (pairwise if inputs <= 300, otherwise non-pairwise) [default]")
   group.add_argument("-lsq12p", action="store_true",
                        help="pairwise 12-parameter registrations")
   group.add_argument("-lsq12n", action="store_true",
                       help="non-pairwise 12-parameter registrations")
   group.add_argument("-tracc",action="store_true",
-                      help="nonlinear processing using minctracc (6 iterations with preset parameters) [default: mincANTS]")
+                      help="nonlinear processing using minctracc (6 iterations)[default: mincANTS]")
   group.add_argument("-tracc_stage", choices=['1','2','3','4','5','6'], 
                       help="run a single iteration of minctracc")
   group.add_argument("-ants", action="store_true", 
@@ -468,14 +494,13 @@ if __name__ == '__main__':
                       help="landmark-based facial feature analysis")  
   
   # Other pipeline options
-  group = parser.add_argument_group('Other pipeline options')
+  group = parser.add_argument_group('Additional pipeline options')
   group.add_argument("-longitudinal", action="store_true",
                       help="longitudinal analysis (for time-1 and time-2 images)")
   group.add_argument("-asymm", action="store_true", 
                       help="asymmetric analysis")
   group.add_argument("-set_dircos", action="store_true",
-                     help="set the directions cosines for each dimension [xspace: 1 0 0, yspace: 0 1 0, zspace: 0 0 1] with the\
-                     first mincresample (during preprocessing stage)")
+                     help="set the directions cosines for each dimension [xspace: 1 0 0, yspace: 0 1 0, zspace: 0 0 1]")
   
   
   

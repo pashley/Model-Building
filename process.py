@@ -232,6 +232,7 @@ def mnc_avg(inputfolder,inputreg,outputname):
   execute('mincaverage -clob */%s/*_%s.mnc avgimages/%s' %(inputfolder,inputreg,outputname))
   return
 
+
 def mincANTS(from_image, to_image, output_xfm, iterations):
   # Executes nonlinear registrations using mincANTS
 
@@ -246,6 +247,7 @@ def mincANTS(from_image, to_image, output_xfm, iterations):
   #--affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
   #--use-Histogram-Matching \
   return 
+
 
 def ants_and_resample(inputname, sourcepath, targetimage, number, iterations):
   # STAGE 3 : Nonlinear processing using mincANTS
@@ -378,7 +380,10 @@ def tag_nlinavg():
   #   model image to the nonlinear average image.
   
   from_image = 'sys_881_face_model.mnc' #TODO: filename for now
-  to_image = 'avgimages/nlin4avg.mnc' # when minctracc, nlin6avg.mnc??
+  if os.path.exists('avgimages/nlin6avg_tracc.mnc'):  # minctracc was executed
+    to_image = 'avgimages/nlin6avg_tracc.mnc'
+  else:                                               # mincANTS was executed  
+    to_image = 'avgimages/nlin4avg.mnc' 
   output_xfm = 'model_to_nlinavg.xfm'
   iterations = '100x1x1x1'
   mincANTS(from_image, to_image, output_xfm, iterations) 
@@ -395,14 +400,17 @@ def tag_subject(inputname):
   #   Warps the landmarks to each subject using the inverse of the nonlinear transformation 
   #   that maps the subject to the nonlinear average image.
   
-  # Volumetric differences
-  xfms = []
-  for xfm in glob.glob('%s/nlin_tfiles/%s_nlin?.xfm' %(inputname, inputname)):
-    xfms.append(xfm)
-  xfms = " ".join(xfms) # string of nonlinear xfms  
-  # concate nonlinear transformation files only
+  # concate nonlinear xfms files
+  if os.path.exists('%s/minctracc_out' %inputname):                # minctracc was executed 
+    xfms = '%s/minctracc_out/%s_nlin6.mnc' %(inputname,inputname)
+  else:                                                            # mincANTS was executed
+    xfms = []
+    for xfm in glob.glob('%s/nlin_tfiles/%s_nlin?.xfm' %(inputname, inputname)):
+      xfms.append(xfm)
+      xfms = " ".join(xfms) # string of nonlinear xfms  
   execute('xfmjoin %s %s/nlin_tfiles/%s_nlin_merged.xfm' %(xfms, inputname, inputname))  
   
+  # Volumetric differences
   input_tag = 'nlin_face_tags.tag'
   input_xfm = '%s/nlin_tfiles/%s_nlin_merged.xfm' %(inputname, inputname) # maps craniofacial structure of subject to average image
   output_tag = '%s/%s_voldiff_landmarks' %(inputname, inputname)
@@ -500,7 +508,6 @@ def asymmetric_analysis(inputname):
   
   # flip 
   execute('volflip -x -clob %s/output_lsq12/%s_lsq12.mnc %s/output_lsq12/%s_flipped_lsq12.mnc' %(inputname, inputname, inputname, inputname))
-  if not os.path.exists()
   
   # Nonlinearly register each MRI volume to its respective flippped coronal image volume
   if not os.path.exists('%s/nlin_tfiles/%s_nlin_grid_0.mnc' %(inputname, inputname)):
