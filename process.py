@@ -11,7 +11,7 @@ import shutil
 
 
 """ 
-A series a functions which execute the stages of the Model-Building Pipeline when 
+A series of functions which execute the stages of the Model-Building Pipeline when 
 called upon by pipeline.py
 
             Stage                           Associated Functions (called by pipeline.py)           
@@ -214,13 +214,27 @@ def linavg_and_check(inputfolder, inputreg, outputname):
 
 def resample(xfm, inputpath, outputpath):
   # Mincresample using a transformation file
+  
+  # get the direction cosines of the input image
+  direction_cosines = execute('mincinfo -attvalue xspace:direction_cosines \
+                                        -attvalue yspace:direction_cosines \
+                                        -attvalue zspace:direction_cosines \
+                                                  %s' %inputpath)
+  # set the directions cosines to (if they are not already)
+  # 1 0 0 (xspace)  \
+  # 0 1 0 (yspace)   equivalent to '1 0 0 \n0 1 0 \n0 0 1 \n' (as printed by mincinfo) 
+  # 0 0 1 (zspace)  /
   if os.path.exists('targetimage.mnc'):   #TODO:better way??
-    execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc'
-            %(xfm, inputpath, outputpath))  
-  else:
-    if len(glob.glob('H*/NORM/*_crop.mnc')) == 1:
-      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_crop.mnc'
-              %(xfm, inputpath, outputpath))
+    if direction_cosines == '1 0 0 \n0 1 0 \n0 0 1 \n':
+      execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))
+    else: 
+      execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc -dircos 1 0 0 0 1 0 0 0 1' %(xfm, inputpath, outputpath))  
+  elif len(glob.glob('H*/NORM/*_crop.mnc')) == 1:
+    if direction_cosines == '1 0 0 \n0 1 0 \n0 0 1 \n':
+      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_crop.mnc' %(xfm, inputpath, outputpath))
+    else:
+      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_crop.mnc -dircos 1 0 0 0 1 0 0 0 1' %(xfm, inputpath, outputpath)) 
+      
     #if len(glob.glob('H*/NORM/*_face_crop.mnc')) == 1:
       #execute('mincresample -clob -transformation %s %s %s 
       #-sinc -like H*/NORM/*_face_crop.mnc' %(xfm, inputpath, outputpath))    
@@ -390,7 +404,7 @@ def tag_nlinavg():
   
   input_tag = 'face_tags_sys881_June21_2012.tag' #TODO: filename for now
   input_xfm = output_xfm
-  output_tag = 'nlin_face_tags'
+  output_tag = 'nlin_model_face_tags'
   execute('transform_tags %s %s %s' %(input_tag, input_xfm, output_tag))
   return
 
@@ -411,7 +425,7 @@ def tag_subject(inputname):
   execute('xfmjoin %s %s/nlin_tfiles/%s_nlin_merged.xfm' %(xfms, inputname, inputname))  
   
   # Volumetric differences
-  input_tag = 'nlin_face_tags.tag'
+  input_tag = 'nlin_model_face_tags.tag'
   input_xfm = '%s/nlin_tfiles/%s_nlin_merged.xfm' %(inputname, inputname) # maps craniofacial structure of subject to average image
   output_tag = '%s/%s_voldiff_landmarks' %(inputname, inputname)
   iterations = '100x1x1x1'
@@ -433,7 +447,8 @@ def tag_subject(inputname):
   
   tagfile = open('%s/%s_vol_shape_diff_landmarks.tag' %(inputname, inputname), 'r')
   csvfile = open('%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname, 'w'))
-  create_csv(tagfile, csvfile) 
+  create_csv(tagfile, csvfile)
+  
   return 
 
 
@@ -445,7 +460,9 @@ def create_csv(tagfile, csvfile):
       values = line.split()
       thevalues = values[0] + "," + values[1] + "," + values[2]
       csvfile.write(thevalues)
-      csvfile.write("\n")  
+      csvfile.write("\n")
+  csvfile.close()
+  tagfile.close()
   return
 
 
@@ -510,17 +527,17 @@ def asymmetric_analysis(inputname):
   execute('volflip -x -clob %s/output_lsq12/%s_lsq12.mnc %s/output_lsq12/%s_flipped_lsq12.mnc' %(inputname, inputname, inputname, inputname))
   
   # Nonlinearly register each MRI volume to its respective flippped coronal image volume
-  if not os.path.exists('%s/nlin_tfiles/%s_nlin_grid_0.mnc' %(inputname, inputname)):
+  if not os.path.exists('%s/asymmetrical/%s_nlin_grid_0.mnc' %(inputname, inputname)):
     mincANTS('%s/output_lsq12/%s_lsq12.mnc' %(inputname, inputname),          # from_image
              '%s/output_lsq12/%s_flipped_lsq12.mnc' %(inputname, inputname),  # to_image
              '%s/asymmetrical/%s_nlin.xfm' %(inputname, inputname),           # output_xfm
              '100x1x1x1')                                                     # iterations
     
-  # 6) Get Jacobian determinant of each transformation
+  # Get Jacobian determinant of each transformation
   execute('mincblob -clob -determinant %s/asymmetrical/%s_nlin_grid_0.mnc %s/asymmetrical/%s_det.mnc' %(inputname, inputname, inputname,inputname))
     
-  # 7) Blur
-  execute('mincblur -clob -fwhm 8 %s/asymmetrical/%s_det.mnc %s/asymmetrical/%s_det' %(inputname, inputname, inputname, inputname))
+  # Blur
+  execute('mincblur -clob -fwhm 4 %s/asymmetrical/%s_det.mnc %s/asymmetrical/%s_det' %(inputname, inputname, inputname, inputname))
 
   return 
 
@@ -560,4 +577,6 @@ if __name__ == '__main__':
     tag_subject(sys.argv[2])
   elif cmd == 'longitudinal':
     longitudinal(sys.argv[2])
+  elif cmd == 'asymmetric_analysis':
+    asymmetric_analysis(sys.argv[2])
     

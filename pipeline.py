@@ -143,8 +143,9 @@ def call_preprocess2():
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
  
-  job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
-  submit_jobs('s1_b', 's1_a_*', job_list)
+  if len(glob.glob('H*/NORM/*_crop.mnc')) == 0:
+    job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
+    submit_jobs('s1_b', 's1_a_*', job_list)
   
   job_list = []
   for sourcename in listofinputs:
@@ -218,7 +219,8 @@ def pairwise():
 def call_linavg():
   # Average linearly processed images & check for completion of the lsq12 stage 
   job_list = ['./process.py linavg_and_check output_lsq12 lsq12 linavg.mnc']
-  submit_jobs('linavg', 's3_*', job_list)
+  if not os.path.exists('avgimages/linavg.mnc'):
+    submit_jobs('linavg', 's3_*', job_list)
   return
 
   
@@ -234,7 +236,8 @@ def ANTS_and_avg(number, sourcefolder,inputregname, targetimage, iterations):
  
  # PART 2: calls mnc_avg
   job_list = ['./process.py mnc_avg nlin_timages nlin%s nlin%savg.mnc' %(number, number)]
-  submit_jobs('nlin%savg' %number, 'reg%s_*' %number, job_list)
+  if not os.path.exists('avgimages/nlin%savg.mnc' % number):
+    submit_jobs('nlin%savg' %number, 'reg%s_*' %number, job_list)
   return
  
   
@@ -318,25 +321,25 @@ def call_longitudinal():
   # run entire pipeline on time-1 images 
   run_all()
    
-  # logitudinal analysis  
+  # longitudinal analysis  
   job_list = []
   for inputname_time2 in listofinputs_time2:
     create_dirs('longitudinal')
     if not os.path.exists('%s/longitudinal/det_fwhm8_blur.mnc' %inputname_time2[0:-2]):
       job_list.append('./process.py longitudinal %s' %inputname_time2)
-  submit_jobs('long', 's6_*', job_list)
+  submit_jobs('lg', 's6_*', job_list)
   return
 
 
 def landmark():
   # Calls the landmark facial feature analysis option
   job_list = ['./process.py tag_nlinavg']
-  if not os.path.exists('model_to_nlinavg.xfm'):
+  if not os.path.exists('nlin_model_face_tags.tag'):
     submit_jobs('ldmk_model','s6_*', job_list)
     
   job_list = []
   for inputname in listofinputs:
-    if not os.path.exists('%s/%s_landmarks.tag' %(inputname, inputname)):
+    if not os.path.exists('%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname)):
       job_list.append('./process.py tag_subject %s' %inputname)
   submit_jobs('lndmk', 'ldmk_model*', job_list)    
   return
@@ -345,11 +348,12 @@ def call_asymm():
   # Calls the asymmetrical analysis option
   create_dirs('asymmetrical')
   
+  
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/asymmetrical/%s_det_blur.mnc' %(inputname, inputname)):
       job_list.append('./process.py asymmetric_analysis %s' %inputname)
-  submit_jobs('asymm','something*',job_list)    
+  submit_jobs('asymm','s3_*' ,job_list)    
   return
 
 
@@ -380,7 +384,7 @@ def create_dirs(stage):
     dirs.append('final_stats')
   
   elif stage == 'longitudinal':
-    dirs.stage == 'longitudinal'
+    dirs.append == 'longitudinal'
   
   elif stage == 'asymmetrical':
     dirs.append('asymmetrical')
@@ -418,6 +422,7 @@ def run_all():
   
   if landmarks == 'True':
     landmark()
+
   return
 
 
@@ -432,9 +437,9 @@ if __name__ == '__main__':
              1) pipeline.py, process.py, utils.py, xfmjoin.
              2) all input images in 'inputs' directory.
              3) targetimage.mnc & targetmask.mnc files (for linear 6-parameter 
-                registrations). Otherwise, use the '-random_target' option.
+                registrations). Or use the '-random_target' option.
         
-          Default stages: preprocess, lsq12, ants, stats (for brain imaging)
+          Default stages: preprocess, lsq12, ants, stats  (brain imaging)
  
         
         For specialized options 
@@ -496,9 +501,10 @@ if __name__ == '__main__':
   # Other pipeline options
   group = parser.add_argument_group('Additional pipeline options')
   group.add_argument("-longitudinal", action="store_true",
-                      help="longitudinal analysis (for time-1 and time-2 images)")
+                      help="longitudinal analysis (Processes time-1 images with all default stages first. Use \
+                      -run_with option for non-default stages.)")
   group.add_argument("-asymm", action="store_true", 
-                      help="asymmetric analysis")
+                      help="asymmetric analysis (assumes lsq12 stage completed)")
   group.add_argument("-set_dircos", action="store_true",
                      help="set the directions cosines for each dimension [xspace: 1 0 0, yspace: 0 1 0, zspace: 0 0 1]")
   
@@ -534,7 +540,7 @@ if __name__ == '__main__':
     landmarks = 'True'
   else:
     landmarks = 'False'   # default
-    
+
   
   listofinputs = []
   if prefix_list == None:       # when no prefix is specified, process all inputs
@@ -588,9 +594,11 @@ if __name__ == '__main__':
 
  
   # Run the entire pipeline with specific options 
-  if args.run_with:          
+  if args.run_with and not args.longitudinal:          
     run_all()
-  
+  elif args.run_with and args.longitudinal:
+    call_longitudinal()
+
   # Run single stages   
   elif args.preprocess:    
     call_preprocess()            # preprocessing stage
