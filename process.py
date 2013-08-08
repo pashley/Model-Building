@@ -354,22 +354,10 @@ def deformation(inputname):
   except subprocess.CalledProcessError:
     # can't access minctracc output grid, so assume mincANTS was executed
     # join all the nonlinear transformation files
-    xfms = ""
-    for xfm in glob.glob('%s/nlin_tfiles/*.xfm' %inputname):  
-      if xfm[-11:] != 'inverse.xfm':
-        xfms += xfm
-        xfms += " "
-    execute('xfmjoin %s %s/%s_merged2.xfm' %(xfms, inputname, inputname))
-    outfile = open('xfms.xfm', 'w')
-    outfile.write(xfms)
-    outfile.close()      
-    #execute('xfmjoin %s/nlin_tfiles/%s_nlin1.xfm \
-                     #%s/nlin_tfiles/%s_nlin2.xfm \
-                     #%s/nlin_tfiles/%s_nlin3.xfm \
-                     #%s/nlin_tfiles/%s_nlin4.xfm \
-                     #%s/%s_merged2.xfm' 
-                     #%(inputname, inputname, inputname, inputname, inputname, 
-                       #inputname, inputname, inputname, inputname, inputname))
+    the_xfms = glob.glob('%s/nlin_tfiles/*.xfm' %inputname)
+    xfms = " ".join(the_xfms)
+    execute('xfmjoin %s %s/%s_merged2.xfm' %(xfms, inputname, inputname))   
+    
     # re-write the merged transformation file without the absolute pathnames 
     # of the displacement volumes
     outputfile = open('%s/%s_merged.xfm' %(inputname,inputname), 'w')
@@ -393,19 +381,29 @@ def tag_nlinavg():
   #   Transforms the model tags (landmarks) by the input transform that maps the 
   #   model image to the nonlinear average image.
   
-  from_image = 'sys_881_face_model.mnc' #TODO: filename for now
-  if os.path.exists('avgimages/nlin6avg_tracc.mnc'):  # minctracc was executed
-    to_image = 'avgimages/nlin6avg_tracc.mnc'
-  else:                                               # mincANTS was executed  
-    to_image = 'avgimages/nlin4avg.mnc' 
-  output_xfm = 'model_to_nlinavg.xfm'
-  iterations = '100x1x1x1'
-  mincANTS(from_image, to_image, output_xfm, iterations) 
+  # generate xfm that maps the model image to the nonlinear average model
+  if not os.path.exists('nlavg_landmarks/model_to_nlinavg.xfm'):
+    
+    from_image = 'sys_881_face_model.mnc' #TODO: filename for now
+    if os.path.exists('avgimages/nlin6avg_tracc.mnc'):  # minctracc was executed
+      to_image = 'avgimages/nlin6avg_tracc.mnc'
+    else:                                               # mincANTS was executed  
+      to_image = 'avgimages/nlin4avg.mnc' 
+    mkdirp('nlavg_landmarks')
+    output_xfm = 'nlavg_landmarks/model_to_nlinavg.xfm'
+    iterations = '100x1x1x1'
+    mincANTS(from_image, to_image, output_xfm, iterations) 
   
+  # transform tags
   input_tag = 'face_tags_sys881_June21_2012.tag' #TODO: filename for now
   input_xfm = output_xfm
   output_tag = 'nlin_model_face_tags'
   execute('transform_tags %s %s %s' %(input_tag, input_xfm, output_tag))
+  
+  # create csv file of tags
+  tag_file = output_tag + ".tag"
+  csv_file = output_tag + ".csv"
+  create_csv(tag_file, csv_file)
   return
 
 
@@ -414,46 +412,51 @@ def tag_subject(inputname):
   #   Warps the landmarks to each subject using the inverse of the nonlinear transformation 
   #   that maps the subject to the nonlinear average image.
   
-  # concate nonlinear xfms files
+  # get concated nonlinear xfms
   if os.path.exists('%s/minctracc_out' %inputname):                # minctracc was executed 
-    xfms = '%s/minctracc_out/%s_nlin6.mnc' %(inputname,inputname)
+    input_xfm = '%s/minctracc_out/%s_nlin6.mnc' %(inputname,inputname)
   else:                                                            # mincANTS was executed
-    xfms = []
-    for xfm in glob.glob('%s/nlin_tfiles/%s_nlin?.xfm' %(inputname, inputname)):
-      xfms.append(xfm)
-      xfms = " ".join(xfms) # string of nonlinear xfms  
-  execute('xfmjoin %s %s/nlin_tfiles/%s_nlin_merged.xfm' %(xfms, inputname, inputname))  
+    input_xfm = '%s/%s_merged.xfm' %(inputname, inputname)     # maps craniofacial structure of subject to average image
   
-  # Volumetric differences
+  # Part 1) Volumetric differences
   input_tag = 'nlin_model_face_tags.tag'
-  input_xfm = '%s/nlin_tfiles/%s_nlin_merged.xfm' %(inputname, inputname) # maps craniofacial structure of subject to average image
   output_tag = '%s/%s_voldiff_landmarks' %(inputname, inputname)
-  iterations = '100x1x1x1'
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) # use inverse of the transform (to bring landmarks to subject space)
   
-  tagfile = open('%s/%s_voldiff_landmarks.tag' %(inputname, inputname), 'r')
-  csvfile = open('%s/%s_voldiff_landmarks.csv' %(inputname, inputname), 'w')
-  create_csv(tagfile, csvfile)
+  tag_file = '%s/%s_voldiff_landmarks.tag' %(inputname, inputname)
+  csv_file = '%s/%s_voldiff_landmarks.csv' %(inputname, inputname)
+  create_csv(tag_file, csv_file)
   
-  # Shape & volumetric differences  
-  avg_lsq12_xfm = ' %s/lin_tfiles/%s_lsq12.xfm' %(inputname, inputname)  # average lsq12 transform file
-  xfms += avg_lsq12_xfm 
-  # concate lsq12 & nonlinear transformation files
-  execute('xfmjoin %s %s/nlin_tfiles/%s_lsq12_nlin_merged.xfm' %(xfms, inputname, inputname))
+  # Part 2) Shape & volumetric differences
   
-  input_xfm = '%s/nlin_tfiles/%s_lsq12_nlin_merged.xfm' %(inputname, inputname)
+  # concate nonlinear & lsq12 xfms
+  the_xfms = glob.glob('%s/nlin_tfiles/%s_nlin?.xfm' %(inputname, inputname))
+  xfms = " ".join(the_xfms)
+  xfms += ' %s/lin_tfiles/%s_lsq12.xfm' %(inputname, inputname)  # average lsq12 transform file 
+  execute('xfmjoin %s %s/%s_merged2_nlin_lsq12.xfm' %(xfms, inputname, inputname))   
+        
+  # re-write the merged transformation file without the absolute pathnames 
+  # of the displacement volumes
+  outputfile = open('%s/%s_merged_nlin_lsq12.xfm' %(inputname,inputname), 'w')
+  info = open('%s/%s_merged2_nlin_lsq12.xfm' %(inputname,inputname)).read()
+  outputfile.write(re.sub("= %s/" %inputname, "= ",info))
+  outputfile.close() 
+
+  input_xfm = '%s/%s_merged_nlin_lsq12.xfm' %(inputname,inputname)
   output_tag = '%s/%s_vol_shape_diff_landmarks' %(inputname, inputname)
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) 
   
-  tagfile = open('%s/%s_vol_shape_diff_landmarks.tag' %(inputname, inputname), 'r')
-  csvfile = open('%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname, 'w'))
-  create_csv(tagfile, csvfile)
+  tag_file = '%s/%s_vol_shape_diff_landmarks.tag' %(inputname, inputname)
+  csv_file = '%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname)
+  create_csv(tag_file, csv_file)
   
   return 
 
 
 def create_csv(tagfile, csvfile):
   # Creates a csv file with tag file
+  tagfile = open(tagfile, 'r')
+  csvfile = open(csvfile, 'w')
   csvfile.write("x,y,z\n")
   for line in tagfile:
     if len(line) > 50:
@@ -501,18 +504,20 @@ def longitudinal(inputname_time2):
                     %(inputname, inputname))
   
   # 5) Concatenate nonlinear transformation files
-  xfms = ""
-  for xfm in glob.glob('%s/nlin_tfiles/%s_nlin?.xfm' %(inputname, inputname)):
-    xfms += xfm
-    xfms += " "
-  execute('xfmjoin %s %s/nlin_tfiles/%s_nlin_merged.xfm' %(xfms, inputname, inputname))
-  
+
+  if os.path.exists('%s/minctracc_out' %inputname):                # minctracc was executed 
+    merged_xfm = '%s/minctracc_out/%s_nlin6.mnc' %(inputname,inputname)
+    like = 'nlin6avg.mnc'
+  else:                                                            # mincANTS was executed
+    merged_xfm = '%s/%s_merged.xfm' %(inputname, inputname)
+    like = 'nlin4avg.mnc'
+ 
   # 6) Warp back to the model space (generated from time-1 nonlinear processing)
   execute('mincresample -clob \
-                        -transformation %s/nlin_tfiles/%s_nlin_merged.xfm \
+                        -transformation %s \
                         %s/longitudinal/det.mnc \
                         %s/longitudinal/det2model.mnc \
-                        -like avgimages/nlin4avg.mnc' %(inputname, inputname, inputname, inputname))  #TODO: minctracc? will have nlin6avg.mnc
+                        -like avgimages/%s' %(merged_xfm, inputname, inputname, like))  #TODO: minctracc? will have nlin6avg.mnc
   # 7) Blur
   execute('mincblur -clob -fwhm 4 %s/longitudinal/det2model.mnc %s/longitudinal/det_fwhm4' %(inputname, inputname))
   execute('mincblur -clob -fwhm 6 %s/longitudinal/det2model.mnc %s/longitudinal/det_fwhm6' %(inputname, inputname))

@@ -13,7 +13,7 @@ import textwrap
 Model-building pipeline
 
 This pipeline takes in a set of images and processes them both linearly and 
-nonlinearly to produce an average population model of either the brain or cranifacial structure.
+nonlinearly to produce an average population model of either the brain or craniofacial structure.
 .....
 
 To run the pipeline (pipeline.py),
@@ -66,7 +66,7 @@ Asymmetrical analysis
      - avgsize*
      - blurmod*
      - linavg*
-     - lndmk_model*
+     - ldmk_model*
      - nlin*
      - reg*
      - s1*
@@ -167,13 +167,13 @@ def nonpairwise():
   targetname = listofinputs[target]
   
   # PART 1: calls lsq12_reg 
-  job_list = []
-  print "targetname == %s" %targetname
-  for sourcename in listofinputs:     
-    if sourcename != targetname: 
-      if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
-        job_list.append('./process.py lsq12_reg %s %s lin_tfiles' %(sourcename, targetname))
-  submit_jobs('s2', 's1*', job_list)
+  if not os.path.exists('avgsize.mnc'):  
+    job_list = []
+    for sourcename in listofinputs:     
+      if sourcename != targetname: 
+        if not os.path.exists('%s/lin_tfiles/%s_%s_lsq12.xfm' %(sourcename, sourcename, targetname)):
+          job_list.append('./process.py lsq12_reg %s %s lin_tfiles' %(sourcename, targetname))
+    submit_jobs('s2', 's1*', job_list)
         
   # PART 2: calls xfmavg_inv_resample
   job_list = ['./process.py xfmavg_inv_resample %s' %targetname]
@@ -334,14 +334,14 @@ def call_longitudinal():
 def landmark():
   # Calls the landmark facial feature analysis option
   job_list = ['./process.py tag_nlinavg']
-  if not os.path.exists('nlin_model_face_tags.tag'):
+  if not os.path.exists('nlin_model_face_tags.csv'):
     submit_jobs('ldmk_model','s6_*', job_list)
     
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname)):
       job_list.append('./process.py tag_subject %s' %inputname)
-  submit_jobs('lndmk', 'ldmk_model*', job_list)    
+  submit_jobs('ldmk', 'ldmk_model*', job_list)    
   return
 
 def call_asymm():
@@ -402,15 +402,16 @@ def run_all():
   call_preprocess()
   
   # select method for 12-parameter registrations
-  if lsq12 == 'pairwise':
-    pairwise()
-  elif lsq12 == 'nonpairwise':
-    nonpairwise()
-  elif lsq12 == 'number_dependent':  # method dependent on the number of inputs
-    if count <= 300:
+  if not os.path.exists('avgimages/linavg.mnc'):
+    if lsq12 == 'pairwise':
       pairwise()
-    elif count > 300:
+    elif lsq12 == 'nonpairwise':
       nonpairwise()
+    elif lsq12 == 'number_dependent':  # method dependent on the number of inputs
+      if count <= 300:
+        pairwise()
+      elif count > 300:
+        nonpairwise()
   
   # select method for nonlinear processing
   if nlin == 'tracc':
@@ -504,11 +505,10 @@ if __name__ == '__main__':
                       help="longitudinal analysis (Processes time-1 images with all default stages first. Use \
                       -run_with option for non-default stages.)")
   group.add_argument("-asymm", action="store_true", 
-                      help="asymmetric analysis (assumes lsq12 stage completed)")
+                      help="asymmetric analysis (assumes lsq12 stage is running or complete)")
   group.add_argument("-set_dircos", action="store_true",
                      help="set the directions cosines for each dimension [xspace: 1 0 0, yspace: 0 1 0, zspace: 0 0 1]")
-  
-  
+    
   
   args = parser.parse_args()
   batch_system = args.batch_system
