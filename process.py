@@ -215,29 +215,30 @@ def linavg_and_check(inputfolder, inputreg, outputname):
 def resample(xfm, inputpath, outputpath):
   # Mincresample using a transformation file
   
-  # get the direction cosines of the input image
-  direction_cosines = execute('mincinfo -attvalue xspace:direction_cosines \
-                                        -attvalue yspace:direction_cosines \
-                                        -attvalue zspace:direction_cosines \
-                                                  %s' %inputpath)
+  # determine the "like" image
+  if os.path.exists('targetimage.mnc'):
+    like_image = 'targetimage.mnc'
+  elif len(glob.glob('*/NORM/*_crop.mnc')) == 1:
+    like_image = '*/NORM/*_crop.mnc'
+    
+  # get the direction cosines of the input image & target images
+  source_dircos = execute('mincinfo -attvalue xspace:direction_cosines \
+                                    -attvalue yspace:direction_cosines \
+                                    -attvalue zspace:direction_cosines \
+                                    %s' %inputpath)
+  target_dircos = execute('mincinfo -attvalue xspace:direction_cosines \
+                                     -attvalue yspace:direction_cosines \
+                                     -attvalue zspace:direction_cosines \
+                                     %s' %like_image)
   # set the directions cosines to (if they are not already)
   # 1 0 0 (xspace)  \
   # 0 1 0 (yspace)   equivalent to '1 0 0 \n0 1 0 \n0 0 1 \n' (as printed by mincinfo) 
   # 0 0 1 (zspace)  /
-  if os.path.exists('targetimage.mnc'):   #TODO:better way??
-    if direction_cosines == '1 0 0 \n0 1 0 \n0 0 1 \n':
-      execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))
-    else: 
-      execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc -dircos 1 0 0 0 1 0 0 0 1' %(xfm, inputpath, outputpath))  
-  elif len(glob.glob('*/NORM/*_crop.mnc')) == 1:
-    if direction_cosines == '1 0 0 \n0 1 0 \n0 0 1 \n':
-      execute('mincresample -clob -transformation %s %s %s -sinc -like */NORM/*_crop.mnc' %(xfm, inputpath, outputpath))
-    else:
-      execute('mincresample -clob -transformation %s %s %s -sinc -like */NORM/*_crop.mnc -dircos 1 0 0 0 1 0 0 0 1' %(xfm, inputpath, outputpath)) 
-      
-    #if len(glob.glob('H*/NORM/*_face_crop.mnc')) == 1:
-      #execute('mincresample -clob -transformation %s %s %s 
-      #-sinc -like H*/NORM/*_face_crop.mnc' %(xfm, inputpath, outputpath))    
+  if source_dircos == '1 0 0 \n0 1 0 \n0 0 1 \n' and target_dircos == '1 0 0 \n0 1 0 \n0 0 1 \n':   
+    execute('mincresample -clob -transformation %s %s %s -sinc -like %s' %(xfm, inputpath, outputpath, like_image))
+  else:   # set directions cosines
+    execute('mincresample -clob -transformation %s %s %s -sinc -like %s -dircos 1 0 0 0 1 0 0 0 1' 
+            %(xfm, inputpath, outputpath, like_image))    
   return
 
 
@@ -273,15 +274,6 @@ def ants_and_resample(inputname, sourcepath, targetimage, number, iterations):
   to_image = 'avgimages/%s' %targetimage
   output_xfm = '%s/nlin_tfiles/%s_nlin%s.xfm' %(inputname, inputname, number)
   mincANTS(from_image, to_image, output_xfm, iterations)
-  #execute('mincANTS 3 -m PR[%s,avgimages/%s,1,4] \
-      #--number-of-affine-iterations 10000x10000x10000x10000x10000 \
-      #--MI-option 32x16000 \
-      #--affine-gradient-descent-option 0.5x0.95x1.e-4x1.e-4 \
-      #--use-Histogram-Matching \
-      #-r Gauss[3,0] \
-      #-t SyN[0.5] \
-      #-o %s/nlin_tfiles/%s_nlin%s.xfm \
-      #-i %s' %(sourcepath, targetimage, inputname, inputname, number, iterations))
   resample('%s/nlin_tfiles/%s_nlin%s.xfm' %(inputname, inputname, number),
            sourcepath, '%s/nlin_timages/%s_nlin%s.mnc'
            %(inputname,inputname,number))   

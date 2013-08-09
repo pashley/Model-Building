@@ -147,8 +147,8 @@ def call_preprocess():
   for inputname in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
-  submit_jobs('s1_a', "something*", job_list) # fix dependency?
-  if target_type == 'random' or image_type == 'face':
+  submit_jobs('s1_a', "something*", job_list) # TODO: fix dependency?
+  if target_type == 'random':
     call_preprocess2()
   return 
 
@@ -161,7 +161,7 @@ def call_preprocess2():
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
  
-  if len(glob.glob('H*/NORM/*_crop.mnc')) == 0:
+  if len(glob.glob('*/NORM/*_crop.mnc')) == 0:
     job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
     submit_jobs('s1_b', 's1_a_*', job_list)
   
@@ -169,17 +169,15 @@ def call_preprocess2():
   for sourcename in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename)):
       job_list.append('./process.py preprocess2 %s %s %s' %(sourcename, targetname, image_type))
-  #submit_jobs('s1_b', 's1_a_*', job_list)
   submit_jobs('s1_c', 's1_b*', job_list)
   return
 
  
 def nonpairwise():
   # Sets up the non-pairwise 12-parameter registration stage.
-  # This is the alternative to pairwise 12-parameter registrations (when there are too many inputs,for instance)
+  # This is the alternative to pairwise 12-parameter registrations (i.e when there are too many inputs)
   
   create_dirs('lsq12n')
-  
   # randomly select a subject to be the target image
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
@@ -277,7 +275,6 @@ def tracc_resmp(stage, fwhm, iterations, step, model):
   # Sets up the nonlinear processing stage which uses minctracc
 
   # PART 1: calls model_blur
-  #job_list = ['mincblur -clob -fwhm %s avgimages/%s avgimages/%s' %(fwhm,model,model[0:-4])]
   job_list =['./process.py model_blur %s %s' %(fwhm, model)]
   if not os.path.exists('avgimages/nlin%savg_tracc.mnc' %stage):
     if stage == 1:
@@ -328,7 +325,6 @@ def call_final_stats():
     submit_jobs('s6', 'nlin*_*', job_list)
   else:
     submit_jobs('s6', 'nlin*', job_list)
-  # dependency ???
   return
 
 
@@ -496,7 +492,7 @@ if __name__ == '__main__':
   group.add_argument("-run_with", action="store_true", 
                        help="run the entire pipeline with any single stage options that are specified on the command line")
   group.add_argument("-echo",action="store_true", 
-                     help="echo the program to be executed")
+                     help="prints the job submissions")
   
   # Running individual stages of the pipeline
   group = parser.add_argument_group('Options for running indiviudal stages of pipeline')
@@ -528,15 +524,14 @@ if __name__ == '__main__':
                       help="longitudinal analysis (Processes time-1 images with all default stages first. Use \
                       -run_with option for non-default stages.)")
   group.add_argument("-asymm", action="store_true", 
-                      help="asymmetric analysis (assumes lsq12 stage is running or complete)")
-  group.add_argument("-set_dircos", action="store_true",
-                     help="set the directions cosines for each dimension [xspace: 1 0 0, yspace: 0 1 0, zspace: 0 0 1]")
+                      help="asymmetric analysis (lsq12 stage must be on the queue, running or complete)")
     
   
   args = parser.parse_args()
   batch_system = args.batch_system
   prefix_list = args.prefix
    
+  
   if args.face:
     image_type = 'face'
   else:
@@ -608,9 +603,6 @@ if __name__ == '__main__':
   if args.check_inputs:
     sys.exit(1)
   
-  if args.asymm:
-    call_asymm()
-    sys.exit(1)
 
   count = len(listofinputs)  # number of inputs to process
   
