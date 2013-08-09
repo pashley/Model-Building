@@ -61,6 +61,11 @@ Asymmetrical analysis
 - All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any 
   files and/or folders in the directory that pipeline.py is being executed.
   
+  This error may occur:
+  
+  Unable to run job: Script length does not match declared length.
+  Exiting.
+  
   To avoid errors, remove or rename any files and/or folders with names that could be flagged 
   by the following dependency names:
      - avgsize*
@@ -74,13 +79,14 @@ Asymmetrical analysis
      - s3*
      - s6*
      - tr*    
-     
+    
+ 
 ****************            
 """
 
 
 def submit_jobs(jobname, depends, job_list):
-  # Submits a list of jobs to the batch system specified by the user 
+  # Submits a list of jobs to the batch system specified by the user. 
   
   # proceed to submitting if there is at least one job in the list 
   if len(job_list) >= 1:     
@@ -93,8 +99,12 @@ def submit_jobs(jobname, depends, job_list):
           thejobname = jobname + "_" + command_split[2] # the input's name is the 2nd argument in the command 
         else:
           thejobname = jobname
-        #print thejobname  + " " + command    
-        execute('sge_batch -J %s -H "%s" %s' %(thejobname, depends, command))
+          
+        # Echo the job details or submit the job
+        if echo:
+          print 'sge_batch -J %s -H "%s" %s' %(thejobname, depends, command)
+        else:
+          execute('sge_batch -J %s -H "%s" %s' %(thejobname, depends, command))
     
     elif batch_system == 'pbs':
       # create a temporary file with the list of jobs to submit to qbatch
@@ -110,12 +120,20 @@ def submit_jobs(jobname, depends, job_list):
         time = "1:00:00"  # default walltime for 1 batch of 1 tasks
       else:
         time = "2:00:00"  # default walltime for 1 batch of 8 tasks
-      execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s ' %(jobname, depends, basename(cmdfileinfo[1]), batchsize, time))
+      
+      # Echo the job details or submit the job
+      if echo:
+        print './MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s' %(jobname, depends, basename(cmdfileinfo[1]), batchsize, time)
+      else:
+        execute('./MAGeTbrain/bin/qbatch -N %s --afterok_pattern %s %s %s %s' %(jobname, depends, basename(cmdfileinfo[1]), batchsize, time))
       os.remove(cmdfile.name)
     
     elif batch_system == 'local':  # run locally
       for command in job_list:
-        execute(command)
+        if echo:
+          print command
+        else:
+          execute(command)
   return
 
 
@@ -304,7 +322,7 @@ def call_final_stats():
   create_dirs('final_stats')
   job_list = []
   for inputname in listofinputs:
-    if not os.path.exists('%s/final_stats/%s_blur.mnc' %(inputname, inputname)):
+    if not os.path.exists('%s/final_stats/%s_det_blur.mnc' %(inputname, inputname)):
       job_list.append( './process.py deformation %s' %inputname)
   if batch_system == 'pbs':           #TODO: fix depends name
     submit_jobs('s6', 'nlin*_*', job_list)
@@ -476,7 +494,9 @@ if __name__ == '__main__':
                         help="randomly select one input to be the target image\
                         for the linear 6-parameter processing [default: Assumes that targetimage.mnc & targetmask.mnc files are in current directory]")
   group.add_argument("-run_with", action="store_true", 
-                       help="run the entire pipeline with any single stage options that are specified on the command line")  
+                       help="run the entire pipeline with any single stage options that are specified on the command line")
+  group.add_argument("-echo",action="store_true", 
+                     help="echo the program to be executed")
   
   # Running individual stages of the pipeline
   group = parser.add_argument_group('Options for running indiviudal stages of pipeline')
@@ -501,7 +521,7 @@ if __name__ == '__main__':
                       help="final stats: deformation fields, determinant")
   group.add_argument("-landmark", action="store_true",
                       help="landmark-based facial feature analysis")  
-  
+    
   # Other pipeline options
   group = parser.add_argument_group('Additional pipeline options')
   group.add_argument("-longitudinal", action="store_true",
@@ -543,8 +563,13 @@ if __name__ == '__main__':
     landmarks = 'True'
   else:
     landmarks = 'False'   # default
-
   
+  if args.echo:
+    echo = True
+  else:
+    echo = False
+
+  # Generate the list of inputs for processing 
   listofinputs = []
   if prefix_list == None:       # when no prefix is specified, process all inputs
     for subject in glob.glob('inputs/*'):
@@ -557,7 +582,7 @@ if __name__ == '__main__':
         thefile = basename(subject)
         listofinputs.append(thefile[0:-4])
 
-  # Set up for longitudinal analysis
+  # For longitudinal analysis, 
   listofinputs_time2 = []  
   if args.longitudinal:
     for subject in listofinputs:

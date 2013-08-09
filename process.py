@@ -229,11 +229,11 @@ def resample(xfm, inputpath, outputpath):
       execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc' %(xfm, inputpath, outputpath))
     else: 
       execute('mincresample -clob -transformation %s %s %s -sinc -like targetimage.mnc -dircos 1 0 0 0 1 0 0 0 1' %(xfm, inputpath, outputpath))  
-  elif len(glob.glob('H*/NORM/*_crop.mnc')) == 1:
+  elif len(glob.glob('*/NORM/*_crop.mnc')) == 1:
     if direction_cosines == '1 0 0 \n0 1 0 \n0 0 1 \n':
-      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_crop.mnc' %(xfm, inputpath, outputpath))
+      execute('mincresample -clob -transformation %s %s %s -sinc -like */NORM/*_crop.mnc' %(xfm, inputpath, outputpath))
     else:
-      execute('mincresample -clob -transformation %s %s %s -sinc -like H*/NORM/*_crop.mnc -dircos 1 0 0 0 1 0 0 0 1' %(xfm, inputpath, outputpath)) 
+      execute('mincresample -clob -transformation %s %s %s -sinc -like */NORM/*_crop.mnc -dircos 1 0 0 0 1 0 0 0 1' %(xfm, inputpath, outputpath)) 
       
     #if len(glob.glob('H*/NORM/*_face_crop.mnc')) == 1:
       #execute('mincresample -clob -transformation %s %s %s 
@@ -374,7 +374,7 @@ def deformation(inputname):
             %(inputname, inputname, inputname, inputname)) 
   execute('mincblob -determinant %s/final_stats/%s_inversegrid.mnc %s/final_stats/%s_det.mnc'
           %(inputname, inputname, inputname, inputname))
-  execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s' 
+  execute('mincblur -fwhm 6 %s/final_stats/%s_det.mnc %s/final_stats/%s_det' 
           %(inputname, inputname, inputname, inputname))  
   return 
 
