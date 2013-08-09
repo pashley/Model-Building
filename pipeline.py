@@ -384,7 +384,10 @@ def create_dirs(stage):
     dirs.append('final_stats')
   
   elif stage == 'longitudinal':
-    dirs.append == 'longitudinal'
+    dirs.append('longitudinal')
+    dirs.append('longitudinal/NUC_2')
+    dirs.append('longitudinal/output_lsq6')
+    dirs.append('longitudinal/nlin_tfiles')
   
   elif stage == 'asymmetrical':
     dirs.append('asymmetrical')
