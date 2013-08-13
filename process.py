@@ -90,8 +90,7 @@ def preprocess(subject, image_type, target_type):
       execute('bestlinreg -clob -lsq6 \
                           -source_mask {0}/masks/mask.mnc \
                           -target_mask targetmask.mnc \
-                          {0}/NORM/{0}.mnc targetimage.mnc {0}/lin_tfiles/{0}_lsq6.xfm' 
-              %(subject, subject, subject, subject, subject))
+                          {0}/NORM/{0}.mnc targetimage.mnc {0}/lin_tfiles/{0}_lsq6.xfm'.format(subject)) 
       resample('%s/lin_tfiles/%s_lsq6.xfm' %(subject, subject),   # xfm
                '%s/NORM/%s.mnc' %(subject, subject),              # source 
                '%s/output_lsq6/%s_lsq6.mnc' %(subject, subject))  # output
@@ -114,13 +113,10 @@ def autocrop(image_type, targetname):
   # Executed when the target image (for the linear 6-parameter registration
   # in STAGE 1) is a randomly selected subject.
   if image_type == 'brain':
-    execute('autocrop -clobber -isoexpand 10 %s/NORM/%s.mnc %s/NORM/%s_crop.mnc' 
-            %(targetname,targetname,targetname,targetname))
-    execute('autocrop -clobber -isoexpand 10 %s/masks/mask.mnc %s/masks/mask_crop.mnc' 
-            %(targetname, targetname))
+    execute('autocrop -clobber -isoexpand 10 {0}/NORM/{0}.mnc {0}/NORM/{0}_crop.mnc'.format(targetname)) 
+    execute('autocrop -clobber -isoexpand 10 {0}/masks/mask.mnc {0}/masks/mask_crop.mnc'.format(targetname)) 
   elif image_type == 'face':
-    execute('autocrop -clobber -isoexpand 10 %s/NORM/%s_face.mnc %s/NORM/%s_face_crop.mnc' 
-            %(targetname,targetname,targetname,targetname))
+    execute('autocrop -clobber -isoexpand 10 {0}/NORM/{0}_face.mnc {0}/NORM/{0}_face_crop.mnc'.format(targetname))
   return
 
   
@@ -134,17 +130,14 @@ def preprocess2(sourcename, targetname, image_type):
   
   if image_type == 'brain':
     execute('bestlinreg -clob -lsq6 \
-              -source_mask %s/masks/mask.mnc \
-              -target_mask %s/masks/mask_crop.mnc \
-              %s/NORM/%s.mnc %s/NORM/%s_crop.mnc %s/lin_tfiles/%s_%s_lsq6.xfm'
-              %(sourcename, targetname, sourcename, sourcename, targetname,
-                targetname, sourcename, sourcename, targetname))
+              -source_mask {0}/masks/mask.mnc \
+              -target_mask {1}/masks/mask_crop.mnc \
+              {0}/NORM/{0}.mnc {1}/NORM/{1}_crop.mnc {0}/lin_tfiles/{0}_{1}_lsq6.xfm'.format(sourcename, targetname))
     resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), # xfm
              '%s/NORM/%s.mnc' %(sourcename, sourcename),                           # source  
              '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))               # output
   elif image_type == 'face':    
-    execute('bestlinreg -clob -lsq6 %s/NORM/%s_face.mnc %s/NORM/%s_face_crop.mnc %s/lin_tfiles/%s_%s_lsq6.xfm'
-            %(sourcename, sourcename, targetname, targetname, sourcename, sourcename, targetname))
+    execute('bestlinreg -clob -lsq6 {0}/NORM/{0}_face.mnc {1}/NORM/{1}_face_crop.mnc {0}/lin_tfiles/{0}_{1}_lsq6.xfm'.format(sourcename, targetname))
     resample('%s/lin_tfiles/%s_%s_lsq6.xfm' %(sourcename, sourcename, targetname), # xfm
              '%s/NORM/%s_face.mnc' %(sourcename, sourcename),                      # source  
              '%s/output_lsq6/%s_lsq6.mnc' %(sourcename, sourcename))               # output    
@@ -358,10 +351,10 @@ def deformation(inputname):
     outputfile.write(re.sub("= %s/" %inputname, "= ",info))
     outputfile.close()
     os.remove('%s/%s_merged2.xfm' %(inputname,inputname))
-    execute('minc_displacement {0}/output_lsq12/{0}_lsq12.mnc {0}/{0}_merged.xfm {0}/final_stats/{0}_grid.mnc'.format(inputname))
+    execute('minc_displacement -clob {0}/output_lsq12/{0}_lsq12.mnc {0}/{0}_merged.xfm {0}/final_stats/{0}_grid.mnc'.format(inputname))
     execute('minccalc -clob -expression "-1*A[0]" {0}/final_stats/{0}_grid.mnc {0}/final_stats/{0}_inversegrid.mnc'.format(inputname)) 
-  execute('mincblob -determinant {0}/final_stats/{0}_inversegrid.mnc {0}/final_stats/{0}_det.mnc'.format(inputname))
-  execute('mincblur -fwhm 6 {0}/final_stats/{0}_det.mnc {0}/final_stats/{0}_det'.format(inputname))  
+  execute('mincblob -clob -determinant {0}/final_stats/{0}_inversegrid.mnc {0}/final_stats/{0}_det.mnc'.format(inputname))
+  execute('mincblur -clob -fwhm 6 {0}/final_stats/{0}_det.mnc {0}/final_stats/{0}_det'.format(inputname))  
   return 
 
 
