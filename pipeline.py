@@ -96,7 +96,8 @@ def submit_jobs(jobname, depends, job_list):
         # Add the input's name to the name of input-specific jobs 
         if len(job_list) != 1:                      
           command_split = command.split()
-          thejobname = jobname + "_" + command_split[2] # the input's name is the 2nd argument in the command 
+          inputname = command_split[2]    # the input's name is the 2nd argument in the command
+          thejobname = jobname + "_" + inputname[0:4]
         else:
           thejobname = jobname
           
@@ -104,7 +105,7 @@ def submit_jobs(jobname, depends, job_list):
         if echo:
           print 'sge_batch -J %s -H "%s" %s' %(thejobname, depends, command)
         else:
-          execute('sge_batch -J %s -H "%s" %s' %(thejobname, depends, command))
+          execute('sge_batch -J %s -H "%s" -o logfiles/ -e logfiles/ %s' %(thejobname, depends, command))
     
     elif batch_system == 'pbs':
       # create a temporary file with the list of jobs to submit to qbatch
@@ -140,15 +141,13 @@ def submit_jobs(jobname, depends, job_list):
 def call_preprocess():
   # Calls the preprocess stage for every input and submits the jobs
   create_dirs('preprocess')
-  if image_type == 'face':
-    target_type == 'random'  # default  
-  
+ 
   job_list = []
   for inputname in listofinputs:
     if not os.path.exists('%s/output_lsq6/%s_lsq6.mnc' %(inputname, inputname)):
       job_list.append('./process.py preprocess %s %s %s' %(inputname, image_type, target_type))
   submit_jobs('s1_a', "something*", job_list) # TODO: fix dependency?
-  if target_type == 'random':
+  if target_type == 'random' or image_type == 'face':
     call_preprocess2()
   return 
 
@@ -353,7 +352,7 @@ def landmark():
     
   job_list = []
   for inputname in listofinputs:
-    if not os.path.exists('%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname)):
+    if not os.path.exists('%s/%s_size_shape_diff_landmarks.csv' %(inputname, inputname)):
       job_list.append('./process.py tag_subject %s' %inputname)
   submit_jobs('ldmk', 'ldmk_model*', job_list)    
   return
@@ -611,7 +610,8 @@ if __name__ == '__main__':
       mkdirp(inputname)  
   if not os.path.exists('avgimages'):
     mkdirp('avgimages')   
-
+  if not os.path.exists('logfiles'):
+    mkdirp('logfiles')
  
   # Run the entire pipeline with specific options 
   if args.run_with and not args.longitudinal:          

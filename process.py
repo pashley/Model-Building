@@ -82,9 +82,9 @@ def preprocess(subject, image_type, target_type):
     # both themax & themin contain the newline character at the end of the string 
     # Ex. themax = '7054.400964\n', themin = '0\n'
     # themax[0:-1] is the string of the numerical value without the newline character 
-    execute('minccalc -clob -expression "10000*(A[0]-0)/(%s-%s)" \
+    execute('minccalc -clob -expression "10000*(A[0]-%s)/(%s-%s)" \
                       %s/NUC/%s.mnc %s/NORM/%s.mnc'
-            %(themax[0:-1], themin[0:-1], subject, subject, subject, subject)) 
+            %(themin[0:-1],themax[0:-1], themin[0:-1], subject, subject, subject, subject)) 
     mask(subject, 'NORM') # use the normalized image to generate the mask
     if target_type == 'given': # if target image is provided by the user 
       execute('bestlinreg -clob -lsq6 \
@@ -394,7 +394,7 @@ def tag_subject(inputname):
   #   Warps the landmarks to each subject. Outputs a csv file with the coordinates of 
   #   each tag.  
   
-  # Volumetric Differences:
+  # Size Differences:
   # Get the nonlinear transformation file  
   if os.path.exists('%s/minctracc_out' %inputname):                # minctracc was executed, use the xfm from the last iteration
     input_xfm = '%s/minctracc_out/%s_nlin6.mnc' %(inputname,inputname)  
@@ -403,16 +403,16 @@ def tag_subject(inputname):
   
   # Transform tags
   input_tag = 'nlin_model_face_tags.tag'
-  output_tag = '%s/%s_voldiff_landmarks' %(inputname, inputname)
+  output_tag = '%s/%s_sizediff_landmarks' %(inputname, inputname)
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) # use inverse of the transform (to bring landmarks to subject space)
   
   # Write csv file of tags
-  tag_file = '%s/%s_voldiff_landmarks.tag' %(inputname, inputname)
-  csv_file = '%s/%s_voldiff_landmarks.csv' %(inputname, inputname)
+  tag_file = '%s/%s_sizediff_landmarks.tag' %(inputname, inputname)
+  csv_file = '%s/%s_sizediff_landmarks.csv' %(inputname, inputname)
   create_csv(tag_file, csv_file)
   
   
-  # Shape & Volumetric Differences:  
+  # Shape & Size Differences:  
   # concatenate the average lsq12 xfm with the nonlinear xfm(s)
   
   if os.path.exists('%s/minctracc_out' %inputname):      # minctracc executed
@@ -436,11 +436,11 @@ def tag_subject(inputname):
   outputfile.close() 
   # transform tags
   input_xfm = '%s/%s_merged_nlin_lsq12.xfm' %(inputname,inputname)
-  output_tag = '%s/%s_vol_shape_diff_landmarks' %(inputname, inputname)
+  output_tag = '%s/%s_size_shape_diff_landmarks' %(inputname, inputname)
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) 
   # write csv file 
-  tag_file = '%s/%s_vol_shape_diff_landmarks.tag' %(inputname, inputname)
-  csv_file = '%s/%s_vol_shape_diff_landmarks.csv' %(inputname, inputname)
+  tag_file = '%s/%s_size_shape_diff_landmarks.tag' %(inputname, inputname)
+  csv_file = '%s/%s_size_shape_diff_landmarks.csv' %(inputname, inputname)
   create_csv(tag_file, csv_file)
   
   return 
