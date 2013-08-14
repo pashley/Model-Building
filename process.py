@@ -102,9 +102,9 @@ def preprocess(subject, image_type, target_type):
                   %(subject, subject, subject, subject, subject))    
     themax = execute('mincstats -max -quiet %s/NUC/%s_face.mnc' %(subject, subject)) 	
     themin = execute('mincstats -min -quiet %s/NUC/%s_face.mnc' %(subject, subject))
-    execute('minccalc -clob -expression "10000*(A[0]-0)/(%s-%s)" \
+    execute('minccalc -clob -expression "10000*(A[0]-%s)/(%s-%s)" \
                       %s/NUC/%s_face.mnc %s/NORM/%s_face.mnc' 
-            %(themax[0:-1], themin[0:-1], subject, subject, subject, subject))
+            %(themin[0:-1], themax[0:-1], themin[0:-1], subject, subject, subject, subject))
   return
 
 
@@ -113,10 +113,13 @@ def autocrop(image_type, targetname):
   # Executed when the target image (for the linear 6-parameter registration
   # in STAGE 1) is a randomly selected subject.
   if image_type == 'brain':
-    execute('autocrop -clobber -isoexpand 10 {0}/NORM/{0}.mnc {0}/NORM/{0}_crop.mnc'.format(targetname)) 
-    execute('autocrop -clobber -isoexpand 10 {0}/masks/mask.mnc {0}/masks/mask_crop.mnc'.format(targetname)) 
+    execute('autocrop -clobber -isoexpand 10 {0}/NORM/{0}.mnc {0}/NORM/{0}_1crop.mnc'.format(targetname)) 
+    execute('autocrop -clobber -isoexpand 10 {0}/masks/mask.mnc {0}/masks/mask_1crop.mnc'.format(targetname))
+    execute('mincresample -clob -like {0}/NORM/{0}_1crop.mnc -dircos 1 0 0 0 1 0 0 0 1 {0}/NORM/{0}_1crop.mnc {0}/NORM/{0}_crop.mnc'.format(targetname))
+    execute('mincresample -clob -like {0}/masks/mask_1crop.mnc -dircos 1 0 0 0 1 0 0 0 1 {0}/masks/mask_1crop.mnc {0}/masks/mask_crop.mnc'.format(targetname))    
   elif image_type == 'face':
-    execute('autocrop -clobber -isoexpand 10 {0}/NORM/{0}_face.mnc {0}/NORM/{0}_face_crop.mnc'.format(targetname))
+    execute('autocrop -clobber -isoexpand 10 {0}/NORM/{0}_face.mnc {0}/NORM/{0}_face_1crop.mnc'.format(targetname))
+    execute('mincresample -clob -like {0}/NORM/{0}_face_1crop.mnc -dircos 1 0 0 0 1 0 0 0 1 {0}/NORM/{0}_face_1crop.mnc {0}/NORM/{0}_face_crop.mnc'.format(targetname))
   return
 
   
@@ -417,7 +420,7 @@ def tag_subject(inputname):
   
   if os.path.exists('%s/minctracc_out' %inputname):      # minctracc executed
     execute('xfmjoin {0}/lin_tfiles/{0}_lsq12.xfm \
-                     {0}/minctracc_out/{0}_nlin6.mnc \
+                     {0}/minctracc_out/{0}_out6.xfm \
                      {0}/{0}_merged2_nlin_lsq12.xfm'.format(inputname))
   else:                                                  # mincANTS was executed                                                               
     execute('xfmjoin {0}/lin_tfiles/{0}_lsq12.xfm \
@@ -469,6 +472,7 @@ def longitudinal(inputname_time2):
   
   # 1) Intensity inhomogeneity correction for time-2 images
   execute('nu_correct inputs/%s.mnc %s/longitudinal/NUC_2/%s_nuc.mnc' %(inputname_time2, inputname, inputname_time2))
+
   
   # 2) Rigid body 6-parameter transformation of the (corrected) time-2 image to the (original corrected) time-1 image of every subject. 
 
@@ -499,7 +503,7 @@ def longitudinal(inputname_time2):
   
   # 5) Concatenate nonlinear transformation files
   if os.path.exists('%s/minctracc_out' %inputname):                # minctracc was executed 
-    merged_xfm = '%s/minctracc_out/%s_nlin6.mnc' %(inputname,inputname)
+    merged_xfm = '%s/minctracc_out/%s_out6.xfm' %(inputname,inputname)
   else:                                                            # mincANTS was executed
     merged_xfm = '%s/%s_merged.xfm' %(inputname, inputname)
  

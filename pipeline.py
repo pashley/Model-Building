@@ -63,8 +63,8 @@ Asymmetrical analysis
   
   This error may occur:
   
-  Unable to run job: Script length does not match declared length.
-  Exiting.
+  "Unable to run job: Script length does not match declared length.
+  Exiting."
   
   To avoid errors, remove or rename any files and/or folders with names that could be flagged 
   by the following dependency names:
@@ -80,7 +80,7 @@ Asymmetrical analysis
      - s6*
      - tr*    
     
- 
+ - "davinci" -problems with sienax (fsl)
 ****************            
 """
 
@@ -159,7 +159,8 @@ def call_preprocess2():
   # randomly select a subject to be the target image
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
- 
+  targetname = 'H146_CAMH'
+  
   if len(glob.glob('*/NORM/*_crop.mnc')) == 0:
     job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
     submit_jobs('s1_b', 's1_a_*', job_list)
