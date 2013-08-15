@@ -367,22 +367,22 @@ def tag_nlinavg():
   #   model image to the nonlinear average image.
   
   # generate xfm that maps the model image to the nonlinear average model
-  if not os.path.exists('nlavg_landmarks/model_to_nlinavg.xfm'):
+  if not os.path.exists('nlinavg_landmarks/model_to_nlinavg.xfm'):
     
     from_image = 'sys_881_face_model.mnc'               #TODO: filename for now
     if os.path.exists('avgimages/nlin6avg_tracc.mnc'):  # minctracc was executed
       to_image = 'avgimages/nlin6avg_tracc.mnc'
     else:                                               # mincANTS was executed  
       to_image = 'avgimages/nlin4avg.mnc' 
-    mkdirp('nlavg_landmarks')
-    output_xfm = 'nlavg_landmarks/model_to_nlinavg.xfm'
+    mkdirp('nlinavg_landmarks')
+    output_xfm = 'nlinavg_landmarks/model_to_nlinavg.xfm'
     iterations = '100x1x1x1'
     mincANTS(from_image, to_image, output_xfm, iterations) 
   
   # transform tags
   input_tag = 'face_tags_sys881_June21_2012.tag'        #TODO: filename for now
   input_xfm = output_xfm
-  output_tag = 'nlin_model_face_tags'
+  output_tag = 'nlinavg_landmarks/nlin_model_face_tags'
   execute('transform_tags %s %s %s' %(input_tag, input_xfm, output_tag))
   
   # create csv file of tags
@@ -405,13 +405,13 @@ def tag_subject(inputname):
     input_xfm = '%s/%s_merged.xfm' %(inputname, inputname)     
   
   # Transform tags
-  input_tag = 'nlin_model_face_tags.tag'
-  output_tag = '%s/%s_sizediff_landmarks' %(inputname, inputname)
+  input_tag = 'nlinavg_landmarks/nlin_model_face_tags.tag'
+  output_tag = '%s/landmarks/%s_sizediff_landmarks' %(inputname, inputname)
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) # use inverse of the transform (to bring landmarks to subject space)
   
   # Write csv file of tags
-  tag_file = '%s/%s_sizediff_landmarks.tag' %(inputname, inputname)
-  csv_file = '%s/%s_sizediff_landmarks.csv' %(inputname, inputname)
+  tag_file = '%s/landmarks/%s_sizediff_landmarks.tag' %(inputname, inputname)
+  csv_file = '%s/landmarks/%s_sizediff_landmarks.csv' %(inputname, inputname)
   create_csv(tag_file, csv_file)
   
   
@@ -437,13 +437,14 @@ def tag_subject(inputname):
   info = open('%s/%s_merged2_nlin_lsq12.xfm' %(inputname,inputname)).read()
   outputfile.write(re.sub("= %s/" %inputname, "= ",info))
   outputfile.close() 
+  os.remove('%s/%s_merged2_nlin_lsq12.xfm' %(inputname,inputname))
   # transform tags
   input_xfm = '%s/%s_merged_nlin_lsq12.xfm' %(inputname,inputname)
-  output_tag = '%s/%s_size_shape_diff_landmarks' %(inputname, inputname)
+  output_tag = '%s/landmarks/%s_size_shape_diff_landmarks' %(inputname, inputname)
   execute('transform_tags %s %s %s invert' %(input_tag, input_xfm, output_tag)) 
   # write csv file 
-  tag_file = '%s/%s_size_shape_diff_landmarks.tag' %(inputname, inputname)
-  csv_file = '%s/%s_size_shape_diff_landmarks.csv' %(inputname, inputname)
+  tag_file = '%s/landmarks/%s_size_shape_diff_landmarks.tag' %(inputname, inputname)
+  csv_file = '%s/landmarks/%s_size_shape_diff_landmarks.csv' %(inputname, inputname)
   create_csv(tag_file, csv_file)
   
   return 

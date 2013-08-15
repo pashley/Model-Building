@@ -159,7 +159,6 @@ def call_preprocess2():
   # randomly select a subject to be the target image
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
-  targetname = 'H146_CAMH'
   
   if len(glob.glob('*/NORM/*_crop.mnc')) == 0:
     job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
@@ -347,8 +346,9 @@ def call_longitudinal():
 
 def landmark():
   # Calls the landmark facial feature analysis option
+  create_dirs("landmarks")
   job_list = ['./process.py tag_nlinavg']
-  if not os.path.exists('nlin_model_face_tags.csv'):
+  if not os.path.exists('nlinavg_landmarks/nlin_model_face_tags.csv'):
     submit_jobs('ldmk_model','s6_*', job_list)
     
   job_list = []
@@ -405,6 +405,9 @@ def create_dirs(stage):
   
   elif stage == 'asymmetrical':
     dirs.append('asymmetrical')
+  
+  elif stage == 'landmarks':
+    dirs.append('landmarks')
 
   for directory in dirs:
     for inputname in listofinputs:
