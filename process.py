@@ -345,8 +345,6 @@ def deformation(inputname):
                      {0}/nlin_tfiles/{0}_nlin3.xfm \
                      {0}/nlin_tfiles/{0}_nlin4.xfm \
                      {0}/{0}_merged2.xfm'.format(inputname))   
-    # foo = 'xfmjoin {0}/nlin_blah/{1}.xfm {0}/nlin'.format(basepath, second)
-    
     # re-write the merged transformation file without the absolute pathnames 
     # of the displacement volumes
     outputfile = open('%s/%s_merged.xfm' %(inputname,inputname), 'w')

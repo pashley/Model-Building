@@ -518,7 +518,7 @@ if __name__ == '__main__':
                       help="run a single iteration of mincANTS")
   group.add_argument("-stats", action="store_true",
                       help="final stats: deformation fields, determinant")
-  group.add_argument("-landmark", action="store_true",
+  group.add_argument("-landmarks", action="store_true",
                       help="landmark-based facial feature analysis")  
     
   # Other pipeline options
@@ -557,7 +557,7 @@ if __name__ == '__main__':
   else:
     lsq12 = 'number_dependent'  # default
   
-  if args.landmark:
+  if args.landmarks:
     landmarks = 'True'
   else:
     landmarks = 'False'   # default
