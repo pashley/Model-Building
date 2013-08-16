@@ -32,13 +32,12 @@ called upon by pipeline.py
 4  Deformation fields                  deformation
 
 
-   Landmarked-based facial feature     (functions from stages 1-4), tag_nlinavg, tag_subject
+*  Landmarked-based facial feature     (functions from stages 1-4), tag_nlinavg, tag_subject
    analysis (optional)
    
-   Longitudinal analysis (optional)    longitudinal
+*  Longitudinal analysis (optional)    (functions from stages 1-4), longitudinal
 
-   Asymmetrical analysis (optional)    asymmetric_analysis
-
+*  Asymmetrical analysis (optional)    asymmetric_analysis
         
 """
 
@@ -352,10 +351,12 @@ def deformation(inputname):
     outputfile.write(re.sub("= %s/" %inputname, "= ",info))
     outputfile.close()
     os.remove('%s/%s_merged2.xfm' %(inputname,inputname))
-    execute('minc_displacement -clob {0}/output_lsq12/{0}_lsq12.mnc {0}/{0}_merged.xfm {0}/final_stats/{0}_grid.mnc'.format(inputname))
+    execute('minc_displacement -2 -clob {0}/output_lsq12/{0}_lsq12.mnc {0}/{0}_merged.xfm {0}/final_stats/{0}_grid.mnc'.format(inputname))
     execute('minccalc -clob -expression "-1*A[0]" {0}/final_stats/{0}_grid.mnc {0}/final_stats/{0}_inversegrid.mnc'.format(inputname)) 
   execute('mincblob -clob -determinant {0}/final_stats/{0}_inversegrid.mnc {0}/final_stats/{0}_det.mnc'.format(inputname))
-  execute('mincblur -clob -fwhm 6 {0}/final_stats/{0}_det.mnc {0}/final_stats/{0}_det'.format(inputname))  
+  execute('mincblur -clob -fwhm 4 {0}/final_stats/{0}_det.mnc {0}/final_stats/{0}_det_4'.format(inputname))  
+  execute('mincblur -clob -fwhm 6 {0}/final_stats/{0}_det.mnc {0}/final_stats/{0}_det_6'.format(inputname))
+  execute('mincblur -clob -fwhm 8 {0}/final_stats/{0}_det.mnc {0}/final_stats/{0}_det_8'.format(inputname))
   return 
 
 

@@ -9,38 +9,15 @@ import sys
 import random
 import tempfile
 import textwrap
-"""  
+
+""" Determines which stages of the Model-Building Pipeline need to be run 
 Model-building pipeline
 
 This pipeline takes in a set of images and processes them both linearly and 
 nonlinearly to produce an average population model of either the brain or craniofacial structure.
 .....
 
-To run the pipeline (pipeline.py),
-A) the following scripts must be present in the same directory containing pipeline.py:
-     - process.py
-     - utils.py
-     - xfmjoin 
-     - MAGetbrain ? for qbatch  
-    
-B) the following modules must be loaded
-     - python
-     - FSL
-     - minc toolbox 
-     - octave
-
-C) all subjects (minc images) one wishes to process must be in a directory called 
-   'inputs' located within the directory containing pipeline.py 
-   
-D) the target image and target mask (for the linear 6-parameter registration) 
-   must located in the directory containing pipeline.py and be named 
-   targetimage.mnc and targetmask.mnc, respectively. 
-   
-   If either file is missing, errors will occur. Alternatively, the 
-   "-random_target" command line option will randomly select a subject to be the 
-   target. When using this option, ensure targetimage.mnc and targetmask.mnc do
-   not exist within the directory (or else silent errors will ensue).
-   
+ 
    
 Specialized Options
 
@@ -159,7 +136,7 @@ def call_preprocess2():
   # randomly select a subject to be the target image
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
-  
+    
   if len(glob.glob('*/NORM/*_crop.mnc')) == 0:
     job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
     submit_jobs('s1_b', 's1_a_*', job_list)
@@ -318,7 +295,7 @@ def call_final_stats():
   create_dirs('final_stats')
   job_list = []
   for inputname in listofinputs:
-    if not os.path.exists('%s/final_stats/%s_det_blur.mnc' %(inputname, inputname)):
+    if not os.path.exists('%s/final_stats/%s_det_8_blur.mnc' %(inputname, inputname)):
       job_list.append( './process.py deformation %s' %inputname)
   if batch_system == 'pbs':           #TODO: fix depends name
     submit_jobs('s6', 'nlin*_*', job_list)
@@ -647,7 +624,7 @@ if __name__ == '__main__':
     call_final_stats()
     
   # Run additional analysis options
-  elif args.landmark:         
+  elif args.landmarks:         
     landmark()
   elif args.longitudinal:
     call_longitudinal() 
