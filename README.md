@@ -7,8 +7,10 @@ population model and the voxelwise jacobian of the deformation field mapping eac
 
 Basic Operation
 
-1.  mkdir my_project
-    Create a directory for your project containing the following scripts:
+1. Create a directory for your project containing the following scripts:
+
+        mkdir my_project 
+
        - pipeline.py
        - process.py
        - utils.py
@@ -26,9 +28,8 @@ to be continued
 
 
 
-Pipeline stages: 
-
-            Stage       
+Pipeline stages
+Stage       
 1. Preprocessing  preprocess
 lsq12, lsq12n, lsq12p  [default: lsq12]
 ants,tracc             [default: ants]
