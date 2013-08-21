@@ -26,7 +26,44 @@ to be continued
 
 
 
+Pipeline stages: 
+
+      Stage       
+1. Preprocessing  preprocess
+lsq12, lsq12n, lsq12p  [default: lsq12]
+ants,tracc             [default: ants]
+stats
+
+
+
+Specialized options
+
+
+
+
+
 
 ** Caveats **
 
+All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any
+files and/or folders in the directory that pipeline.py is being executed. 
 
+The following error may result:
+    
+    Unable to run job: Script length does not match declared length.
+    Exiting.
+
+To avoid errors, remove or rename any files and/or folders with names that could be flagged by 
+any of the following dependency names:
+        - avgsize*
+        - blurmod*
+        - linavg*
+        - lndmk_model*
+        - nlin*
+        - reg*
+        - s1*
+        - s2*
+        - s3*
+        - s6*
+        - tr*
+        
