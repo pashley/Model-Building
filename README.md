@@ -8,12 +8,6 @@ population model and the voxelwise jacobian of the deformation field mapping eac
 Basic Operation
 
 1. Create a directory for your project containing the following scripts:
-
-
-    mkdir my_project 
-
-       
-
 - pipeline.py
        - process.py
        - utils.py
