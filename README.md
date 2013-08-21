@@ -28,7 +28,7 @@ to be continued
 
 Pipeline stages: 
 
-      Stage       
+            Stage       
 1. Preprocessing  preprocess
 lsq12, lsq12n, lsq12p  [default: lsq12]
 ants,tracc             [default: ants]
