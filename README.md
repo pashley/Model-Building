@@ -11,11 +11,11 @@ Basic Operation
         mkdir my_project
    and copy/link the following scripts into it: 
 
- * `process.py`
- * `pipeline.py`
- * `xfmjoin`
- * `utils.py`
- * `MAGetbrain` (if running it on scinet)
+  * `process.py`
+  * `pipeline.py`
+  * `xfmjoin`
+  * `utils.py`
+  * `MAGetbrain` (if running it on scinet)
 
 2. In `my_project` 
 3. 
