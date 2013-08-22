@@ -1,18 +1,24 @@
-Model-Building
-==============
-
+Model-Building Pipeline
+================================
+-------------------------
 This pipeline takes in a set of MR images and processes them (both linearly & nonlinearly) to generate the average 
 population model and the voxelwise jacobian of the deformation field mapping each subject to it.
 
+Basic Operation 
+-------------------------
+1. Create a directory for your project
 
-Basic Operation
+        mkdir my_project
+   and copy/link the following scripts into it: 
 
-1. Create a directory for your project containing the following scripts:
-- pipeline.py
-       - process.py
-       - utils.py
-       - xfmjoin
-       - MAGetbrain (if running it on scinet)
+ * `process.py`
+ * `pipeline.py`
+ * `xfmjoin`
+ * `utils.py`
+ * `MAGetbrain` (if running it on scinet)
+
+2. In `my_project` 
+3. 
 
 2. mkdir my_project/inputs
    Create an "inputs" directory (within my_project)
