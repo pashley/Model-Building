@@ -11,7 +11,7 @@ mkdir my_project
 cd my_project
 ```
    and copy/link the following scripts into it: 
-`process.py`, `pipeline.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if running you're it on SciNet).
+`process.py`, `pipeline.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if you're running it on SciNet).
 
 2. In `my_project`, 
 ```
@@ -19,10 +19,9 @@ mkdir inputs/
 ```
 
 3. Copy/link all subjects into `inputs/`. 
-     
-	For the longitudinal analysis option, follow-up images must have the same name 	 as the respective baseline image and end in `_2.mnc`. For example, 
- * baseline image:  `H001.mnc`
- * follow-up image:  `H001_2.mnc`		
+   For the longitudinal analysis option, follow-up images must have the same name as the respective baseline image and     end in `_2.mnc`. For example, 
+    * baseline image:  `H001.mnc`
+    * follow-up image:  `H001_2.mnc`		
 
 4. Copy/link the preprocessing (linear 6-parameter registration) reference image and its reference mask as `targetimage.mnc` and `targetmask.mnc`, respectively. 
 
@@ -41,30 +40,54 @@ Batch system options: `local`, `sge` , `pbs`
 
 Default stages: `-preprocess`, `-lsq12`, `-ants`, `-stats` (for brain imaging)
 
+By default, the pipeline will process all images in the inputs folder. To select a subset of the inputs images, use the `-prefix` option.  
+
 
 #### Example command lines:
 
-###### Running the entire pipeline 
- * `./pipeline.py sge `  executes the entire pipeline with default stages
- * `./pipeline.py sge -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
-
-###### Running individual stages
- * `./pipeline.py sge -tracc ` executes all six iterations
- * `./pipeline.py sge -tracc_stage 3 ` executes only the third iteration of minctracc
-
-###### Running the craniofacial pipeline
- * `./pipeline.py sge -face` executes the entire craniofacial pipeline with default stages 
- * `./pipeline.py sge -preprocess -face` executes the preprocessing stage for the craniofacial structure 
-
-
-###### Running the longitudinal analysis option
- * `./pipeline.py sge -longitudinal` executes the longitudinal analysis (with default stages for processing baseline images)
- * `./pipeline.py sge -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when processing baseline images)
-
-###### Running the asymmetry analysis option
- * `./pipeline.py sge -asymm` executes the asymmetry analysis option
-  
+> ###### Running the entire pipeline 
+> * `./pipeline.py sge `                  executes the entire pipeline with default stages
+> * `./pipeline.py sge -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
+>
+>###### Running individual stages
+> * `./pipeline.py sge -tracc ` executes all six iterations
+> * `./pipeline.py sge -tracc_stage 3 ` executes only the third iteration of minctracc
+>
+>###### Running the craniofacial pipeline
+> * `./pipeline.py sge -face` executes the entire craniofacial pipeline with default stages 
+> * `./pipeline.py sge -preprocess -face` executes the preprocessing stage for the craniofacial structure 
+>
+>###### Running the longitudinal analysis option
+>* `./pipeline.py sge -longitudinal` executes the longitudinal analysis (with default stages for processing baseline >images)
+> * `./pipeline.py sge -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when >processing baseline images)
+>
+>###### Running the asymmetry analysis option
+> * `./pipeline.py sge -asymm` executes the asymmetry analysis option
+>
+>###### 
  
+
+
+To execute the entire pipeline with the default stages:
+
+    ./pipeline.py sge      
+    
+Use the `-run_with` option to run the entire pipeline with non-default a stage(s). For, example to run the pipeline with minctracc instead of mincANTS, 
+
+    ./pipeline.py sge -run_with -tracc                    
+
+To run an individual stage, specify the stage
+
+    ./pipeline.py sge -tracc         # executes all six iterations
+
+For the iterative nonlinear registration alg
+./pipeline.py sge -tracc_stage 3                      # executes only the third iteration of minctracc
+./pipeline.py sge -face`                              # executes the entire craniofacial pipeline with default stages 
+./pipeline.py sge -preprocess -face                   # executes the preprocessing stage for the craniofacial structure 
+./pipeline.py sge -longitudinal                       # executes the longitudinal analysis (with default stages for                                                           # processing baseline images)
+./pipeline.py sge -longitudinal -run_with -tracc`     # executes the longitudinal analysis (using minctracc when                                                              # processing baseline images)
+./pipeline.py sge -asymm`                             # executes the asymmetry analysis option
+
 
 
 
@@ -80,4 +103,3 @@ files and/or folders in the directory that pipeline.py is being executed. The fo
 To avoid errors, remove or rename any files and/or folders with names that could be flagged by 
 any of the following dependency names: 
 `avgsize*`, `blurmod*`, `linavg*`, `lndmk_model*`, `nlin*`, `reg*`, `s1*`, `* s2*`, `s3*`, `s6*`, `tr*`.
-        
