@@ -7,7 +7,7 @@ population model and the voxelwise jacobian of the deformation field mapping eac
 Basic Set-Up 
 -------------------------
 1. Create a directory for your project,
-```
+```bash
 mkdir my_project
 cd my_project
 ```
