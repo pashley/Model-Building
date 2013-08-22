@@ -38,43 +38,28 @@ Usage:
 ```
 Batch system options: `local`, `sge` , `pbs`
 
-Pipeline stages: 
-
-
-Specialized options
 
 | Pipeline Stages | Command line option(s) |
 | -------------   |:-------------:	   |
-| Preprocessing   | `-preprocess`            |
+| Preprocessing   |`-preprocess`            |
 | Linear 12-pararmeter registrations     |`-lsq12`, `-lsq12p`, `-lsq12n`|
-| Nonlinear processing   | `-ants`, `-ants_stage`, `-tracc`, `-tracc_stage`|               |
+| Nonlinear processing   | `-ants`, `-ants_stage`, `-tracc`, `-tracc_stage`|            
+| Deformation field | `-stats`|
 
 
 
 
 
 
-** Caveats **
-
+Caveats 
+-------------------------
 All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any
-files and/or folders in the directory that pipeline.py is being executed. 
-
-The following error may result:
+files and/or folders in the directory that pipeline.py is being executed. The following error may occur:
     
     Unable to run job: Script length does not match declared length.
     Exiting.
 
 To avoid errors, remove or rename any files and/or folders with names that could be flagged by 
-any of the following dependency names:
-        - avgsize*
-        - blurmod*
-        - linavg*
-        - lndmk_model*
-        - nlin*
-        - reg*
-        - s1*
-        - s2*
-        - s3*
-        - s6*
-        - tr*
+any of the following dependency names: 
+`avgsize*`, `blurmod*`, `linavg*`, `lndmk_model*`, `nlin*`, `reg*`, `s1*`, `* s2*`, `s3*`, `s6*`, `tr*`.
         
