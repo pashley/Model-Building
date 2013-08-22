@@ -1,8 +1,8 @@
 Model-Building Pipeline
 ================================
--------------------------
 This pipeline takes in a set of MR images and processes them (both linearly & nonlinearly) to generate the average 
 population model and the voxelwise jacobian of the deformation field mapping each subject to it.
+
 Basic configuration  
 -------------------------
 1. Create a directory for your project,
@@ -32,27 +32,39 @@ mkdir inputs/
 
 Name this section
 -------------------------
-Usage:
+###### Usage: 
 ```
- ./pipeline.py [batch_system] [-options]
+./pipeline.py [batch_system] [-options]
 ```
 Batch system options: `local`, `sge` , `pbs`
 
+`./pipeline.py --help` for more information regarding the options
 
-| Pipeline Stages | Command line option(s) |
-| -------------   |:-------------:	   |
-| Preprocessing   |`-preprocess`            |
-| Linear 12-pararmeter registrations     |`-lsq12`, `-lsq12p`, `-lsq12n`|
-| Nonlinear processing   | `-ants`, `-ants_stage`, `-tracc`, `-tracc_stage`|            
-| Deformation field | `-stats`|
+Default stages:
+`-preprocess`, `-lsq12`, `ants`, `stats` (for brain imaging)
 
 
+### Example command lines:
+
+
+**Comand line Examples**             | **Executes** 
+-------------                        | ---------------------  
+`./pipeline.py sge`                  | entire pipeline with default stages
+`./pipeline.py sge -run_with -tracc` | entire pipeline with minctracc (instead of mincANTS)
+`./pipeline.py sge -tracc`           | minctracc (all 6 iterations)
+`./pipeline.py sge -tracc_stage 2`    | second iteration of minctracc (& will be fail if iteration 1 was not previously complete)     
+`./pipeline.py sge -longitudinal`    | longitudinal analysis (with default stages for processing baseline images)
+`./pipeline.py sge -longitudinal -run_with -tracc` | longitudinal analysis with minctracc for processing baseline images
+`./pipeline.py sge -asymm`           | asymmetrical analysis
+
+
+`./pipeline.py pbs -ants_stage` 
 
 
 
 
-Caveats 
--------------------------
+###### Caveats 
+-------------------
 All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any
 files and/or folders in the directory that pipeline.py is being executed. The following error may occur:
     
