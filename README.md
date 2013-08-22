@@ -36,32 +36,18 @@ Usage:
 ```
  ./pipeline.py [batch_system] [-options]
 ```
-Batch System options: `local`, `sge`, `pbs`
-<table>
-  <tr>
-    <th>ID</th><th>Name</th><th>Rank</th>
-  </tr>
-  <tr>
-    <td>1</td><td>Tom Preston-Werner</td><td>Awesome</td>
-  </tr>
-  <tr>
-    <td>2</td><td>Albert Einstein</td><td>Nearly as awesome</td>
-  </tr>
-</table>
-
-
+Batch system options: `local`, `sge` , `pbs`
 
 Pipeline stages: 
 
-            Stage       
-1. Preprocessing  preprocess
-lsq12, lsq12n, lsq12p  [default: lsq12]
-ants,tracc             [default: ants]
-stats
-
-
 
 Specialized options
+
+| Pipeline Stages | Command line option(s) |
+| -------------   |:-------------:	   |
+| Preprocessing   | `-preprocess`            |
+| Linear 12-pararmeter registrations     |`-lsq12`, `-lsq12p`, `-lsq12n`|
+| Nonlinear processing   | `-ants`, `-ants_stage`, `-tracc`, `-tracc_stage`|               |
 
 
 
