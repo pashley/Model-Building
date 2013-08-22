@@ -4,25 +4,25 @@ Model-Building Pipeline
 This pipeline takes in a set of MR images and processes them (both linearly & nonlinearly) to generate the average 
 population model and the voxelwise jacobian of the deformation field mapping each subject to it.
 
-Basic Operation 
+Basic Set-Up 
 -------------------------
 1. Create a directory for your project,
 ```
 mkdir my_project
 cd my_project
 ```
-   and copy/link the following scripts into it: `process.py`, `pipeline.py`, `xfmjoin` and `utils.py`, `MAGetbrain` (if running it on scinet).
+   and copy/link the following scripts into it: 
+`process.py`, `pipeline.py`, `xfmjoin` and `utils.py`, `MAGetbrain` (if running it on scinet).
 
 2. In `my_project`, 
 ```
 mkdir inputs/
 ```
 
-3. Copy/link all subjects into `inputs/`.  
+3. Copy/link all subjects into `inputs/`. 
+4. Copy/link the preprocessing (linear 6-parameter registration) reference image and its reference mask as `targetimage.mnc` and `targetmask.mnc`, respectively. 
 
-4. Copy/link the target reference image and its mask as targetimage.mnc and targetmask.mnc,respectively, to my_project.  
-
-to be continued
+  Alternatively, use the `-random_target` command line option to randomly select a subject to be the target. When using this option, ensure `targetimage.mnc` and `targetmask.mnc` do not exist within `my_project`(or else silent errors will occur).
 
 
 
