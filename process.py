@@ -351,8 +351,8 @@ def deformation(inputname):
     outputfile.write(re.sub("= %s/" %inputname, "= ",info))
     outputfile.close()
     os.remove('%s/%s_merged2.xfm' %(inputname,inputname))
-    execute('minc_displacement -2 -clob {0}/output_lsq12/{0}_lsq12.mnc {0}/{0}_merged.xfm {0}/final_stats/{0}_grid.mnc'.format(inputname))
-    execute('minccalc -clob -expression "-1*A[0]" {0}/final_stats/{0}_grid.mnc {0}/final_stats/{0}_inversegrid.mnc'.format(inputname)) 
+    execute('minc_displacement -clob {0}/output_lsq12/{0}_lsq12.mnc {0}/{0}_merged.xfm {0}/final_stats/{0}_grid.mnc'.format(inputname))
+    execute('minccalc -2 -clob -expression "-1*A[0]" {0}/final_stats/{0}_grid.mnc {0}/final_stats/{0}_inversegrid.mnc'.format(inputname)) 
   execute('mincblob -clob -determinant {0}/final_stats/{0}_inversegrid.mnc {0}/final_stats/{0}_det.mnc'.format(inputname))
   execute('mincblur -clob -fwhm 4 {0}/final_stats/{0}_det.mnc {0}/final_stats/{0}_det_4'.format(inputname))  
   execute('mincblur -clob -fwhm 6 {0}/final_stats/{0}_det.mnc {0}/final_stats/{0}_det_6'.format(inputname))
@@ -368,7 +368,7 @@ def tag_nlinavg():
   # generate xfm that maps the model image to the nonlinear average model
   if not os.path.exists('nlinavg_landmarks/model_to_nlinavg.xfm'):
     
-    from_image = 'sys_881_face_model.mnc'               #TODO: filename for now
+    from_image = 'face_model.mnc'               #TODO: filename for now
     if os.path.exists('avgimages/nlin6avg_tracc.mnc'):  # minctracc was executed
       to_image = 'avgimages/nlin6avg_tracc.mnc'
     else:                                               # mincANTS was executed  
@@ -379,7 +379,7 @@ def tag_nlinavg():
     mincANTS(from_image, to_image, output_xfm, iterations) 
   
   # transform tags
-  input_tag = 'face_tags_sys881_June21_2012.tag'        #TODO: filename for now
+  input_tag = 'face_tags.tag'        #TODO: filename for now
   input_xfm = output_xfm
   output_tag = 'nlinavg_landmarks/nlin_model_face_tags'
   execute('transform_tags %s %s %s' %(input_tag, input_xfm, output_tag))

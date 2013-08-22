@@ -13,12 +13,6 @@ import textwrap
 """ Determines which stages of the Model-Building Pipeline need to be run 
 Model-building pipeline
 
-This pipeline takes in a set of images and processes them both linearly and 
-nonlinearly to produce an average population model of either the brain or craniofacial structure.
-.....
-
- 
-   
 Specialized Options
 
 Landmark-based facial feature analysis
@@ -136,7 +130,7 @@ def call_preprocess2():
   # randomly select a subject to be the target image
   target = random.randint(0,count-1) 
   targetname = listofinputs[target]
-    
+  
   if len(glob.glob('*/NORM/*_crop.mnc')) == 0:
     job_list = ['./process.py autocrop %s %s' %(image_type,targetname)]
     submit_jobs('s1_b', 's1_a_*', job_list)
@@ -437,24 +431,7 @@ if __name__ == '__main__':
              3) targetimage.mnc & targetmask.mnc files (for linear 6-parameter 
                 registrations). Or use the '-random_target' option.
         
-          Default stages: preprocess, lsq12, ants, stats  (brain imaging)
- 
-        
-        For specialized options 
-        -----------------------------------
-          Landmark-based facial feature analysis
-            - Within current directory, have 
-                1) sys_881_face_model.mnc (model image)
-                2) face_tags_sys881_June21_2012.tag (model tags)
-        
-          Longitudinal analysis
-            - all time-2 input images in 'inputs' directory must end in "_2"
-              Ex. time-1 image = H001.mnc
-                  time-2 image = H001_2.mnc
-        
-          Asymmetrical analysis
-            - 
-         _______________________________________________________________________  
+          Default stages: preprocess, lsq12, ants, stats  (brain imaging)  
          '''))                              
   # Configuration options
   group = parser.add_argument_group('Configuration options')
