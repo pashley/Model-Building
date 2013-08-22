@@ -11,7 +11,7 @@ mkdir my_project
 cd my_project
 ```
    and copy/link the following scripts into it: 
-`process.py`, `pipeline.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if running you're it on scinet).
+`process.py`, `pipeline.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if running you're it on SciNet).
 
 2. In `my_project`, 
 ```
