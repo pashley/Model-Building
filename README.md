@@ -6,22 +6,19 @@ population model and the voxelwise jacobian of the deformation field mapping eac
 
 Basic Operation 
 -------------------------
-1. Create a directory for your project
-
-        mkdir my_project
-        cd my_project
-
+1. Create a directory for your project,
+```
+mkdir my_project
+cd my_project
+```
    and copy/link the following scripts into it: `process.py`, `pipeline.py`, `xfmjoin` and `utils.py`, `MAGetbrain` (if running it on scinet).
 
-2. In `my_project`, create a directory for your inputs. 
+2. In `my_project`, 
 ```
 mkdir inputs/
 ```
 
-2. mkdir my_project/inputs
-   Create an "inputs" directory (within my_project)
-   
-3. Copy/link all input subject (minc) images to the inputs directory
+3. Copy/link all subjects into `inputs/`.  
 
 4. Copy/link the target reference image and its mask as targetimage.mnc and targetmask.mnc,respectively, to my_project.  
 
