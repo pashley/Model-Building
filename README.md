@@ -30,40 +30,46 @@ mkdir inputs/
 
 5. For the landmark-based facial feature analysis option, copy/link the model image and its landmarks (a .tag file) into `my_project` as `face_model.mnc` and `face_tags.tag`, respectively.
 
-Name this section
+
+How to run the pipeline 
 -------------------------
-###### Usage: 
+#### Usage: 
 ```
 ./pipeline.py [batch_system] [-options]
 ```
 Batch system options: `local`, `sge` , `pbs`
 
-`./pipeline.py --help` for more information regarding the options
-
-Default stages:
-`-preprocess`, `-lsq12`, `ants`, `stats` (for brain imaging)
+Default stages: `-preprocess`, `-lsq12`, `-ants`, `-stats` (for brain imaging)
 
 
-### Example command lines:
+#### Example command lines:
+
+###### Running the entire pipeline 
+ * `./pipeline.py sge `  executes the entire pipeline with default stages
+ * `./pipeline.py sge -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
+
+###### Running individual stages
+ * `./pipeline.py sge -tracc ` executes all six iterations
+ * `./pipeline.py sge -tracc_stage 3 ` executes only the third iteration of minctracc
+
+###### Running the craniofacial pipeline
+ * `./pipeline.py sge -face` executes the entire craniofacial pipeline with default stages 
+ * `./pipeline.py sge -preprocess -face` executes the preprocessing stage for the craniofacial structure 
 
 
-**Comand line Examples**             | **Executes** 
--------------                        | ---------------------  
-`./pipeline.py sge`                  | entire pipeline with default stages
-`./pipeline.py sge -run_with -tracc` | entire pipeline with minctracc (instead of mincANTS)
-`./pipeline.py sge -tracc`           | minctracc (all 6 iterations)
-`./pipeline.py sge -tracc_stage 2`    | second iteration of minctracc (& will be fail if iteration 1 was not previously complete)     
-`./pipeline.py sge -longitudinal`    | longitudinal analysis (with default stages for processing baseline images)
-`./pipeline.py sge -longitudinal -run_with -tracc` | longitudinal analysis with minctracc for processing baseline images
-`./pipeline.py sge -asymm`           | asymmetrical analysis
+###### Running the longitudinal analysis option
+ * `./pipeline.py sge -longitudinal` executes the longitudinal analysis (with default stages for processing baseline images)
+ * `./pipeline.py sge -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when processing baseline images)
 
-
-`./pipeline.py pbs -ants_stage` 
+###### Running the asymmetry analysis option
+ * `./pipeline.py sge -asymm` executes the asymmetry analysis option
+  
+ 
 
 
 
 
-###### Caveats 
+#### Caveats 
 -------------------
 All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any
 files and/or folders in the directory that pipeline.py is being executed. The following error may occur:
