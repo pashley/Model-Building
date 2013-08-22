@@ -9,16 +9,14 @@ Basic Operation
 1. Create a directory for your project
 
         mkdir my_project
-   and copy/link the following scripts into it: 
+        cd my_project
 
-  * `process.py`
-  * `pipeline.py`
-  * `xfmjoin`
-  * `utils.py`
-  * `MAGetbrain` (if running it on scinet)
+   and copy/link the following scripts into it: `process.py`, `pipeline.py`, `xfmjoin` and `utils.py`, `MAGetbrain` (if running it on scinet).
 
-2. In `my_project` 
-3. 
+2. In `my_project`, create a directory for your inputs. 
+```
+mkdir inputs/
+```
 
 2. mkdir my_project/inputs
    Create an "inputs" directory (within my_project)
