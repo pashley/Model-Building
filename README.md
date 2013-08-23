@@ -43,7 +43,7 @@ Running the pipeline
 
  * By default, the pipeline will process all images in `inputs/`. To process only a subset of the images in `inputs/`, use the `-prefix` option and specify a sequence of one or more characters that will flag the inputs you want. For example,
 ```
-            ./pipeline.py sge -prefix 001  
+            ./mb.py sge -prefix 001  
 ```
 
  will process all the inputs flagged by `inputs/*001*`.
@@ -53,27 +53,27 @@ Running the pipeline
 #### Sample command lines:
 
 > ###### Running the entire pipeline 
-> * `./pipeline.py pbs` executes the entire pipeline with default stages
-> * `./pipeline.py pbs -run_with -lsq12p` executes the entire pipeline with pairwise 12-parameter registrations          (overriding the default non-pairwise registration method if the number of inputs > 300)
-> *  `./pipeline.py pbs -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
+> * `./mb.py pbs` executes the entire pipeline with default stages
+> * `./mb.py pbs -run_with -lsq12p` executes the entire pipeline with pairwise 12-parameter registrations          (overriding the default non-pairwise registration method if the number of inputs > 300)
+> * `./mb.py pbs -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
 >
 >###### Running individual stages
-> * `./pipeline.py pbs -tracc ` executes nonlinear processing stage using minctracc (all six iterations) 
-> * `./pipeline.py pbs -tracc_stage 3 ` executes only the third iteration of minctracc
+> * `./mb.py pbs -tracc ` executes nonlinear processing stage using minctracc (all six iterations) 
+> * `./mb.py pbs -tracc_stage 3 ` executes only the third iteration of minctracc
 >
 >###### Running the craniofacial pipeline
-> *  `./pipeline.py pbs -face` executes the entire craniofacial pipeline with default stages 
-> *  `./pipeline.py pbs -preprocess -face` executes the preprocessing stage for the craniofacial structure 
-> * `./pipeline.py pbs -face -run_with -tracc` executes the entire craniofacial pipeline with minctracc
-> *  `./pipeline.py pbs -landmarks` executes only the landmark-based facial feature analysis stage
-> *  `./pipeline.py pbs -landmarks` executes the entire craniofacial pipeline & the landmark-based facial feature        analysis option 
+> * `./mb.py pbs -face` executes the entire craniofacial pipeline with default stages 
+> * `./mb.py pbs -preprocess -face` executes the preprocessing stage for the craniofacial structure 
+> * `./mb.py pbs -face -run_with -tracc` executes the entire craniofacial pipeline with minctracc
+> * `./mb.py pbs -landmarks` executes only the landmark-based facial feature analysis stage
+> * `./mb.py pbs -landmarks` executes the entire craniofacial pipeline & the landmark-based facial feature        analysis option 
 >
 >###### Running the longitudinal analysis option
-> * `./pipeline.py pbs -longitudinal` executes the longitudinal analysis (with default stages for processing baseline    images)
-> *  `./pipeline.py pbs -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when processing baseline images)
+> * `./mb.py pbs -longitudinal` executes the longitudinal analysis (with default stages for processing baseline    images)
+> * `./mb.py pbs -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when processing baseline images)
 >
 >###### Running the asymmetry analysis option
-> *  `./pipeline.py pbs -asymm` executes the asymmetry analysis option
+> * `./mb.py pbs -asymm` executes the asymmetry analysis option
 >
 
  
