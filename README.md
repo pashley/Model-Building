@@ -78,9 +78,8 @@ Running the pipeline
 
  
 
-
 ### Caveats 
-----------------------------
+--------------------
 
 All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any
 files and/or folders in the directory that `modelbuilding.py` is being executed. The following error may occur:
