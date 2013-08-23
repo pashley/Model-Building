@@ -90,4 +90,4 @@ files and/or folders in the directory that `pipeline.py` is being executed. The 
 
 To avoid errors, remove or rename any files and/or folders with names that could be flagged by 
 any of the following dependency names: 
-`avgsize*`, `blurmod*`, `linavg*`, `lndmk_model*`, `nlin*`, `reg*`, `s1*`, `* s2*`, `s3*`, `s6*`, `tr*`.
+`avgsize*`, `blurmod*`, `linavg*`, `lndmk_model*`, `nlin*`, `reg*`, `s1*`, `s2*`, `s3*`, `s6*`, `tr*`.
