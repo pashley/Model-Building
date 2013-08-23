@@ -40,13 +40,17 @@ Batch system options: `local`, `sge` , `pbs`
 
 Default stages: `-preprocess`, `-lsq12`, `-ants`, `-stats` (for brain imaging)
 
-By default, the pipeline will process all images in the inputs folder. To select a subset of the inputs images, use the `-prefix` option.  
+By default, the pipeline will process all images in `inputs/`. To process only a subset of the images in `inputs/`, use the `-prefix` option and specify a sequence of one or more characters that will flag the inputs you want. For example,
+
+     ./pipeline.py sge -prefix 001 
+will process all the inputs flagged by `inputs/*001*`.
 
 
-#### Example command lines:
+#### Sample command lines:
 
 > ###### Running the entire pipeline 
 > * `./pipeline.py sge `                  executes the entire pipeline with default stages
+> * `./pipeline.py sge -run_with -lsq12p` executes the entire pipeline with pairwise 12-parameter registrations (overiding the default non-pairwise registrations if the number of inputs > 300)
 > * `./pipeline.py sge -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
 >
 >###### Running individual stages
@@ -58,8 +62,8 @@ By default, the pipeline will process all images in the inputs folder. To select
 > * `./pipeline.py sge -preprocess -face` executes the preprocessing stage for the craniofacial structure 
 >
 >###### Running the longitudinal analysis option
->* `./pipeline.py sge -longitudinal` executes the longitudinal analysis (with default stages for processing baseline >images)
-> * `./pipeline.py sge -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when >processing baseline images)
+>* `./pipeline.py sge -longitudinal` executes the longitudinal analysis (with default stages for processing baseline                                         images)
+> * `./pipeline.py sge -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when processing baseline images)
 >
 >###### Running the asymmetry analysis option
 > * `./pipeline.py sge -asymm` executes the asymmetry analysis option
@@ -68,32 +72,9 @@ By default, the pipeline will process all images in the inputs folder. To select
  
 
 
-To execute the entire pipeline with the default stages:
-
-    ./pipeline.py sge      
-    
-Use the `-run_with` option to run the entire pipeline with non-default a stage(s). For, example to run the pipeline with minctracc instead of mincANTS, 
-
-    ./pipeline.py sge -run_with -tracc                    
-
-To run an individual stage, specify the stage
-
-    ./pipeline.py sge -tracc         # executes all six iterations
-
-For the iterative nonlinear registration alg
-./pipeline.py sge -tracc_stage 3                      # executes only the third iteration of minctracc
-./pipeline.py sge -face`                              # executes the entire craniofacial pipeline with default stages 
-./pipeline.py sge -preprocess -face                   # executes the preprocessing stage for the craniofacial structure 
-./pipeline.py sge -longitudinal                       # executes the longitudinal analysis (with default stages for                                                           # processing baseline images)
-./pipeline.py sge -longitudinal -run_with -tracc`     # executes the longitudinal analysis (using minctracc when                                                              # processing baseline images)
-./pipeline.py sge -asymm`                             # executes the asymmetry analysis option
-
-
-
-
-
-#### Caveats 
+### Caveats 
 -------------------
+
 All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any
 files and/or folders in the directory that pipeline.py is being executed. The following error may occur:
     
