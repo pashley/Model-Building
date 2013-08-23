@@ -11,7 +11,7 @@ mkdir my_project
 cd my_project
 ```
    and copy/link the following scripts into it: 
-`process.py`, `pipeline.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if you're running it on SciNet).
+   `process.py`, `pipeline.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if you're running it on SciNet).
 
 2. In `my_project`, 
 ```
@@ -20,11 +20,11 @@ mkdir inputs/
 
 3. Copy/link all subjects into `inputs/`. 
    
-   For the **longitudinal analysis** option, follow-up images must have the same name as the respective baseline image and     end in `_2.mnc`. For example, 
+   For the **longitudinal analysis** option, follow-up images must have the same name as the respective baseline image and end in `_2.mnc`. For example, 
     * baseline image:  `H001.mnc`
-    * follow-up image:  `H001_2.mnc`		
+    * follow-up image: `H001_2.mnc`		
 
-4. Copy/link the preprocessing (linear 6-parameter registration) reference image and its reference mask as `targetimage.mnc` and `targetmask.mnc`, respectively. 
+4. Copy/link the preprocessing (linear 6-parameter registration) reference image and its reference mask into               `my_project/` as `targetimage.mnc` and `targetmask.mnc`, respectively,
 
   Alternatively, use the `-random_target` command line option to randomly select a subject to be the target. When using this option, ensure `targetimage.mnc` and `targetmask.mnc` do not exist within `my_project`(or else silent errors will occur).
 
