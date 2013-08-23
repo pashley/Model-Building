@@ -10,49 +10,9 @@ import random
 import tempfile
 import textwrap
 
-""" Determines which stages of the Model-Building Pipeline need to be run 
-Model-building pipeline
-
-Specialized Options
-
-Landmark-based facial feature analysis
-     - the model (minc) image and the landmarks (.tag file) named ?? and ?? , respectively
-
-
-Longitudinal analysis (for time-1 and time-2 images)
-     - all images in 'inputs' directory, 
-     - filenames of time-2 images end in "_2.mnc"
-        Ex. time-1 image = H001.mnc
-            time-2 image = H001_2.mnc
-
-Asymmetrical analysis
-     -
-
-***********CAUTION 
-- All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any 
-  files and/or folders in the directory that pipeline.py is being executed.
-  
-  This error may occur:
-  
-  "Unable to run job: Script length does not match declared length.
-  Exiting."
-  
-  To avoid errors, remove or rename any files and/or folders with names that could be flagged 
-  by the following dependency names:
-     - avgsize*
-     - blurmod*
-     - linavg*
-     - ldmk_model*
-     - nlin*
-     - reg*
-     - s1*
-     - s2*
-     - s3*
-     - s6*
-     - tr*    
-    
- - "davinci" -problems with sienax (fsl)
-****************            
+""" 
+Determines which stages of the Model-Building pipeline need to be executed and
+and submits the necessary jobs to the specified batch system. 
 """
 
 
