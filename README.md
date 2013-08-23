@@ -11,7 +11,7 @@ mkdir my_project
 cd my_project
 ```
    and copy/link the following scripts into it: 
-   `mb.py`, `mb_process.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if you're running it on SciNet).
+   `modelbuilding.py`, `modelbuilding_process.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if you're running it on SciNet).
 
 2. In `my_project`, 
 ```
@@ -35,7 +35,7 @@ Running the pipeline
 -------------------------
 #### Usage: 
 ```
-./mb.py [batch_system] [-options]
+./modelbuilding.py [batch_system] [-options]
 ```
  * Batch system options: `local`, `sge` , `pbs`
 
@@ -43,7 +43,7 @@ Running the pipeline
 
  * By default, the pipeline will process all images in `inputs/`. To process only a subset of the images in `inputs/`, use the `-prefix` option and specify a sequence of one or more characters that will flag the inputs you want. For example,
 ```
-            ./mb.py sge -prefix 001  
+./modelbuilding.py sge -prefix 001  
 ```
 
  will process all the inputs flagged by `inputs/*001*`.
@@ -53,37 +53,37 @@ Running the pipeline
 #### Sample command lines:
 
 > ###### Running the entire pipeline 
-> * `./mb.py pbs` executes the entire pipeline with default stages
-> * `./mb.py pbs -run_with -lsq12p` executes the entire pipeline with pairwise 12-parameter registrations          (overriding the default non-pairwise registration method if the number of inputs > 300)
-> * `./mb.py pbs -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
+> * `./modelbuilding.py pbs` executes the entire pipeline with default stages
+> * `./modelbuilding.py pbs -run_with -lsq12p` executes the entire pipeline with pairwise 12-parameter registrations          (overriding the default non-pairwise registration method if the number of inputs > 300)
+> * `./modelbuilding.py pbs -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
 >
 >###### Running individual stages
-> * `./mb.py pbs -tracc ` executes nonlinear processing stage using minctracc (all six iterations) 
-> * `./mb.py pbs -tracc_stage 3 ` executes only the third iteration of minctracc
+> * `./modelbuilding.py pbs -tracc ` executes nonlinear processing stage using minctracc (all six iterations) 
+> * `./modelbuilding.py pbs -tracc_stage 3 ` executes only the third iteration of minctracc
 >
 >###### Running the craniofacial pipeline
-> * `./mb.py pbs -face` executes the entire craniofacial pipeline with default stages 
-> * `./mb.py pbs -preprocess -face` executes the preprocessing stage for the craniofacial structure 
-> * `./mb.py pbs -face -run_with -tracc` executes the entire craniofacial pipeline with minctracc
-> * `./mb.py pbs -landmarks` executes only the landmark-based facial feature analysis stage
-> * `./mb.py pbs -landmarks` executes the entire craniofacial pipeline & the landmark-based facial feature        analysis option 
+> * `./modelbuilding.py pbs -face` executes the entire craniofacial pipeline with default stages 
+> * `./modelbuilding.py pbs -preprocess -face` executes the preprocessing stage for the craniofacial structure 
+> * `./modelbuilding.py pbs -face -run_with -tracc` executes the entire craniofacial pipeline with minctracc
+> * `./modelbuilding.py pbs -landmarks` executes only the landmark-based facial feature analysis stage
+> * `./modelbuilding.py pbs -landmarks` executes the entire craniofacial pipeline & the landmark-based facial feature        analysis option 
 >
 >###### Running the longitudinal analysis option
-> * `./mb.py pbs -longitudinal` executes the longitudinal analysis (with default stages for processing baseline    images)
-> * `./mb.py pbs -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when processing baseline images)
+> * `./modelbuilding.py pbs -longitudinal` executes the longitudinal analysis (with default stages for processing baseline    images)
+> * `./modelbuilding.py pbs -longitudinal -run_with -tracc` executes the longitudinal analysis (using minctracc when processing baseline images)
 >
 >###### Running the asymmetry analysis option
-> * `./mb.py pbs -asymm` executes the asymmetry analysis option
+> * `./modelbuilding.py pbs -asymm` executes the asymmetry analysis option
 >
 
  
 
 
 ### Caveats 
--------------------
+----------------------------
 
 All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any
-files and/or folders in the directory that `mb.py` is being executed. The following error may occur:
+files and/or folders in the directory that `modelbuilding.py` is being executed. The following error may occur:
     
     Unable to run job: Script length does not match declared length.
     Exiting.
