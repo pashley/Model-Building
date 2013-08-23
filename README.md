@@ -11,7 +11,7 @@ mkdir my_project
 cd my_project
 ```
    and copy/link the following scripts into it: 
-   `process.py`, `pipeline.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if you're running it on SciNet).
+   `mb.py`, `mb_process.py`, `xfmjoin`, `utils.py` and `MAGetbrain` (if you're running it on SciNet).
 
 2. In `my_project`, 
 ```
@@ -35,7 +35,7 @@ Running the pipeline
 -------------------------
 #### Usage: 
 ```
-./pipeline.py [batch_system] [-options]
+./mb.py [batch_system] [-options]
 ```
  * Batch system options: `local`, `sge` , `pbs`
 
@@ -83,7 +83,7 @@ Running the pipeline
 -------------------
 
 All dependency names terminate with the * (asterisk) wildcard, and may in turn flag any
-files and/or folders in the directory that `pipeline.py` is being executed. The following error may occur:
+files and/or folders in the directory that `mb.py` is being executed. The following error may occur:
     
     Unable to run job: Script length does not match declared length.
     Exiting.
