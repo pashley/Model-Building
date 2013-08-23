@@ -54,7 +54,6 @@ Running the pipeline
 
 > ###### Running the entire pipeline 
 > * `./pipeline.py pbs` executes the entire pipeline with default stages
-
 > * `./pipeline.py pbs -run_with -lsq12p` executes the entire pipeline with pairwise 12-parameter registrations          (overiding the default non-pairwise registration method if the number of inputs > 300)
 > *  `./pipeline.py pbs -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
 >
