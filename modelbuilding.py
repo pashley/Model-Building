@@ -379,7 +379,7 @@ def run_all():
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(usage="./mb.py batch_system [options]", 
+  parser = argparse.ArgumentParser(usage="./modelbuilding.py batch_system [options]", 
                                    formatter_class=argparse.RawDescriptionHelpFormatter,
                                    description=textwrap.dedent('''\
         
@@ -405,9 +405,9 @@ if __name__ == '__main__':
                       help="generate a file with the list of inputs to be processed")
   group.add_argument("-random_target", action="store_true",
                         help="randomly select one input to be the target image\
-                        for the linear 6-parameter processing [default: Assumes that targetimage.mnc & targetmask.mnc files are in current directory]")
+                        for the linear 6-parameter processing [default: Assumes that targetimage.mnc & targetmask.mnc files are in the current directory]")
   group.add_argument("-run_with", action="store_true", 
-                       help="run the entire pipeline with any single stage options that are specified on the command line")
+                       help="run the entire pipeline with the non-default single stage option(s) specified on the command line")
   group.add_argument("-echo",action="store_true", 
                      help="prints the job submissions")
   
