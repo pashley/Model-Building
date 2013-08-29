@@ -50,7 +50,9 @@ Running the pipeline
 ```
 ./modelbuilding.py sge -prefix 001 -prefix I6
 ```
-will process all the inputs flagged by `inputs/*001*` and `inputs/*I6*`. 
+will process all the inputs flagged by `inputs/*001*` and `inputs/*I6*`.
+
+ * In the craniofacial pipeline, images are registered (linear 6-parameter) to a randomly selected subject by default in the preprocessing stage. 
 
 
 
