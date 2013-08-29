@@ -46,7 +46,11 @@ Running the pipeline
 ./modelbuilding.py sge -prefix 001  
 ```
 
- will process all the inputs flagged by `inputs/*001*`.
+ will process all the inputs flagged by `inputs/*001*`. Use the `-prefix` option to specify as many subsets needed. For example, 
+```
+./modelbuilding.py sge -prefix 001 -prefix I6
+```
+will process all the inputs flagged by `inputs/*001*` and `inputs/*I6*`. 
 
 
 
