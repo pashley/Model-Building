@@ -56,6 +56,7 @@ Running the pipeline
 > * `./modelbuilding.py pbs` executes the entire pipeline with default stages
 > * `./modelbuilding.py pbs -run_with -lsq12p` executes the entire pipeline with pairwise 12-parameter registrations          (overriding the default non-pairwise registration method if the number of inputs > 300)
 > * `./modelbuilding.py pbs -run_with -tracc ` executes the entire pipeline with minctracc (instead of mincANTS)
+> * `./modelbuilding.py pbs -run_with -lsq12p -tracc` executes the entire pipeline with pairwise 12-parameter registrations and minctracc
 >
 >###### Running individual stages
 > * `./modelbuilding.py pbs -tracc ` executes nonlinear processing stage using minctracc (all six iterations) 
