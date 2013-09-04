@@ -383,14 +383,7 @@ if __name__ == '__main__':
                                    formatter_class=argparse.RawDescriptionHelpFormatter,
                                    description=textwrap.dedent('''\
         
-        For basic operation  
-        -----------------------------------
-          Within the current directory, have  
-             1) pipeline.py, process.py, utils.py, xfmjoin.
-             2) all input images in 'inputs' directory.
-             3) targetimage.mnc & targetmask.mnc files (for linear 6-parameter 
-                registrations). Or use the '-random_target' option.
-        
+
           Default stages: preprocess, lsq12, ants, stats  (brain imaging)  
          '''))                              
   # Configuration options
@@ -400,7 +393,7 @@ if __name__ == '__main__':
   group.add_argument("-face", action="store_true",
                       help="craniofacial structure imaging [default: brain imaging]")
   group.add_argument("-prefix", action="append",    # can specify more than one prefix
-                      help= "specify subset(s) of inputs within the inputs directory to process")
+                      help= "specify subset(s) of input images within the 'inputs' directory to process")
   group.add_argument("-check_inputs", action="store_true",
                       help="generate a file with the list of inputs to be processed")
   group.add_argument("-random_target", action="store_true",
@@ -528,8 +521,9 @@ if __name__ == '__main__':
       mkdirp(inputname)  
   if not os.path.exists('avgimages'):
     mkdirp('avgimages')   
-  if not os.path.exists('logfiles'):
-    mkdirp('logfiles')
+  if batch_system == 'sge':
+    if not os.path.exists('logfiles'):
+      mkdirp('logfiles')
  
   # Run the entire pipeline with specific options 
   if args.run_with and not args.longitudinal:          
